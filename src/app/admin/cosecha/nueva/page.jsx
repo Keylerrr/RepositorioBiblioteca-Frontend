@@ -1,4 +1,4 @@
-import HarvestForm from "@/features/admin/databases/components/HarvestForm";
+import HarvestForm from "@/features/admin/harvesting/components/HarvestForm";
 
 export default function NewHarvestPage() {
   return <HarvestForm />;
