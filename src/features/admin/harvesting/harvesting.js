@@ -82,6 +82,10 @@ export function getHarvests(page, signal) {
   return list("/api/harvesting/harvests/", { page, page_size: 10, ordering: "-created_at" }, signal);
 }
 
+export function getScheduleHarvests(scheduleId, signal) {
+  return listAll("/api/harvesting/harvests/", { schedule: scheduleId, ordering: "-created_at" }, signal);
+}
+
 export function getSchedules(page, signal) {
   return list("/api/harvesting/schedules/", { page, page_size: 10, ordering: "-created_at" }, signal);
 }
@@ -119,6 +123,29 @@ export function checkPlatformLink(platformId, url) {
 
 export function createSchedule(payload) {
   return request("/api/harvesting/schedules/", { method: "POST", body: payload });
+}
+
+export async function runDueSchedules() {
+  const harvests = await request("/api/harvesting/schedules/run-due/", { method: "POST" });
+  if (!Array.isArray(harvests)) throw new Error("La API no devolvió un resultado válido. Actualiza las ejecuciones antes de intentarlo nuevamente.");
+  return harvests;
+}
+
+export function pauseHarvest(id) {
+  return request(`/api/harvesting/harvests/${id}/pause/`, { method: "POST" });
+}
+
+export function resumeHarvest(id) {
+  return request(`/api/harvesting/harvests/${id}/resume/`, { method: "POST" });
+}
+
+export function describeDueRuns(harvests) {
+  if (!harvests.length) return { variant: "neutral", message: "La API no devolvió nuevas ejecuciones. Consulta el estado actualizado de las cosechas; puede que no hubiera programaciones vencidas por ejecutar." };
+  const failures = harvests.filter((harvest) => harvest.state === "failed");
+  return {
+    variant: failures.length ? "error" : "neutral",
+    message: `La API devolvió ${harvests.length} ejecuciones; ${failures.length} fallidas. Consulta su estado para comprobar el resultado.${failures.length ? ` ${failures.map((harvest) => `${harvest.platform_name || `Ejecución #${harvest.id}`}: ${harvest.error_message || "La cosecha falló."}`).join(" · ")}` : ""}`,
+  };
 }
 
 export function buildSchedule({ platformId, limit, minutes, mode, startDate, frequency }, now = new Date()) {
