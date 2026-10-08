@@ -91,8 +91,7 @@ export function getLinkChecks(signal) {
 }
 
 export function getHarvestSources(platforms) {
-  // Una API configurada no garantiza que exista un conector compatible en el backend.
-  return platforms.filter((platform) => platform.base_api_url && platform.status !== "obsoleto");
+  return platforms.filter((platform) => platform.is_harvestable === true);
 }
 
 export function getLatestLinkChecks(platforms, logs) {
