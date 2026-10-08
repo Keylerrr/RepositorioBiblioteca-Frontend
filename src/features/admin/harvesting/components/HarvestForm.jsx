@@ -85,11 +85,11 @@ export default function HarvestForm() {
               <h2 id="source-title" className={headingClasses}>Base de datos a cosechar</h2>
               {loading && <Notice live>Cargando plataformas…</Notice>}
               {sourceError && <Notice variant="error" live>{sourceError}</Notice>}
-              {!loading && !sourceError && !sources.length && <Notice>No hay plataformas con una API de cosecha configurada.</Notice>}
+              {!loading && !sourceError && !sources.length && <Notice>No hay bases de datos habilitadas para cosecha.</Notice>}
               <div className="grid grid-cols-1 gap-3 min-[541px]:grid-cols-2 min-[901px]:grid-cols-4" role="radiogroup" aria-labelledby="source-title">
-                {sources.map((item) => <HarvestSourceOption key={item.id} source={item.name} value={String(item.id)} description="API configurada" checked={platformId === String(item.id)} onChange={() => setPlatformId(String(item.id))} />)}
+                {sources.map((item) => <HarvestSourceOption key={item.id} source={item.name} value={String(item.id)} description="Habilitada para cosecha" checked={platformId === String(item.id)} onChange={() => setPlatformId(String(item.id))} />)}
               </div>
-              {sources.length > 0 && <p className="text-xs text-[#68707C]">Se muestran plataformas con API configurada. La compatibilidad de cada fuente depende de los conectores del backend.</p>}
+              {sources.length > 0 && <p className="text-xs text-[#68707C]">Se muestran únicamente bases de datos habilitadas para cosecha.</p>}
             </section>
             <section className={panelClasses} aria-labelledby="limits-title">
               <h2 id="limits-title" className={headingClasses}>Límites de ejecución</h2>

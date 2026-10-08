@@ -104,7 +104,7 @@ export default function HarvestDashboard() {
         </div>
         <p className="text-sm leading-[22px] text-[#68707C] min-[541px]:text-base min-[541px]:leading-[26px]">Supervisa conectores, ejecuciones y registros modificados.</p>
         <div className="grid grid-cols-2 gap-3 min-[541px]:gap-4 min-[901px]:grid-cols-4">
-          <MetricCard value={showData ? getHarvestSources(data.platforms).length : "—"} label="Fuentes con API configurada" />
+          <MetricCard value={showData ? getHarvestSources(data.platforms).length : "—"} label="Fuentes habilitadas para cosecha" />
           <MetricCard value={showData ? totals.added + totals.updated + totals.failed : "—"} label="Registros contabilizados" />
           <MetricCard value={showData ? totals.updated : "—"} label="Actualizados" />
           <MetricCard value={showData ? totals.failed : "—"} label="Registros fallidos" />
