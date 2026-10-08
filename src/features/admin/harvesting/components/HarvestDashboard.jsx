@@ -1,38 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import AdminTable from "@/shared/components/AdminTable";
-import Badge from "@/shared/components/Badge";
 import Button from "@/shared/components/Button";
 import MetricCard from "@/shared/components/MetricCard";
 import Notice from "@/shared/components/Notice";
-import { formatDate, getHarvests, getHarvestSources, getPlatforms, getSchedules } from "@/features/admin/harvesting/harvesting";
+import { describeDueRuns, formatDate, getHarvests, getHarvestSources, getPlatforms, getSchedules, runDueSchedules } from "@/features/admin/harvesting/harvesting";
+import HarvestExecutions from "./HarvestExecutions";
 
-const STATES = {
-  pending: { label: "Pendiente", badge: "info" },
-  running: { label: "En ejecución", badge: "info" },
-  pausing: { label: "Pausando", badge: "warning" },
-  paused: { label: "Pausada", badge: "warning" },
-  completed: { label: "Completada", badge: "success" },
-  failed: { label: "Fallida", badge: "error" },
-  cancelled: { label: "Cancelada", badge: "warning" },
-};
 const FREQUENCIES = { once: "Única", daily: "Diaria", weekly: "Semanal", monthly: "Mensual" };
-
-const columns = [
-  { key: "platform_name", label: "FUENTE", width: "20%" },
-  { key: "state", label: "ESTADO", width: "19%", render: (row) => {
-    const state = STATES[row.state] || { label: row.state, badge: "info" };
-    return <Badge state={row.state === "completed" && row.records_failed > 0 ? "warning" : state.badge}>{state.label}</Badge>;
-  } },
-  { key: "started_at", label: "ÚLTIMA EJECUCIÓN", width: "23%", muted: true, render: (row) => formatDate(row.started_at) },
-  { key: "result", label: "RESULTADO", width: "38%", render: (row) => (
-    <div>
-      <span>{row.records_added} nuevas · {row.records_updated} actualizadas · {row.records_failed} fallidas</span>
-      {row.error_message && <p className="mt-1 break-words text-xs text-[#820A1F]">{row.error_message}</p>}
-    </div>
-  ) },
-];
 
 const scheduleColumns = [
   { key: "platforms", label: "FUENTES", width: "30%", render: (row) => row.platform_names?.join(", ") || row.platforms.map((id) => `Plataforma ${id}`).join(", ") },
@@ -51,6 +27,9 @@ export default function HarvestDashboard() {
   const [revision, setRevision] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [executing, setExecuting] = useState(false);
+  const [executionFeedback, setExecutionFeedback] = useState(null);
+  const requestPending = useRef(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -83,6 +62,24 @@ export default function HarvestDashboard() {
     setRevision((current) => current + 1);
   }
 
+  async function executeDue() {
+    if (requestPending.current || loading) return;
+    requestPending.current = true;
+    setExecuting(true);
+    setExecutionFeedback(null);
+    try {
+      setExecutionFeedback(describeDueRuns(await runDueSchedules()));
+    } catch (error) {
+      setExecutionFeedback({ variant: "error", message: error.message });
+    } finally {
+      requestPending.current = false;
+      setExecuting(false);
+      // The result may be uncertain after a timeout; always read the current state.
+      setPage(1);
+      refresh();
+    }
+  }
+
   function changePage(nextPage, schedules = false) {
     setLoading(true);
     if (schedules) setSchedulePage(nextPage);
@@ -93,7 +90,7 @@ export default function HarvestDashboard() {
   const totals = runs.reduce((sum, row) => ({
     added: sum.added + row.records_added, updated: sum.updated + row.records_updated, failed: sum.failed + row.records_failed,
   }), { added: 0, updated: 0, failed: 0 });
-  const showData = data && !loading && !error;
+  const showData = Boolean(data);
 
   return (
     <div className="flex-1 bg-[#F7F8FA] font-sans text-sm leading-[22px] text-[#171A1F]">
@@ -117,21 +114,26 @@ export default function HarvestDashboard() {
             <h2 id="runs-title" className="text-[21px] leading-7 font-semibold min-[541px]:text-2xl min-[541px]:leading-8">Ejecuciones recientes</h2>
             <Button variant="quiet" size="small" disabled={loading} onClick={refresh}>Actualizar</Button>
           </div>
-          {showData && (runs.length ? <AdminTable caption="Ejecuciones recientes de cosecha" columns={columns} rows={runs} /> : <Notice>Todavía no hay ejecuciones de cosecha.</Notice>)}
+          {showData && <HarvestExecutions rows={runs} onRefresh={refresh} busy={loading || executing || Boolean(error)} />}
           {showData && data.harvests.total_pages > 1 && <div className="flex flex-wrap items-center gap-3">
-            <Button variant="quiet" size="small" disabled={page <= 1} onClick={() => changePage(page - 1)}>Anterior</Button>
+            <Button variant="quiet" size="small" disabled={loading || page <= 1} onClick={() => changePage(page - 1)}>Anterior</Button>
             <span>Página {page} de {data.harvests.total_pages} · {data.harvests.total_items} ejecuciones</span>
-            <Button variant="quiet" size="small" disabled={page >= data.harvests.total_pages} onClick={() => changePage(page + 1)}>Siguiente</Button>
+            <Button variant="quiet" size="small" disabled={loading || page >= data.harvests.total_pages} onClick={() => changePage(page + 1)}>Siguiente</Button>
           </div>}
           <Button href="/admin/cosecha/nueva" className="mt-auto w-[220px] self-start">Nueva cosecha</Button>
         </section>
         <section className="flex flex-col gap-3.5 rounded-xl border border-[#DCE0E5] bg-white p-5" aria-labelledby="schedules-title" aria-busy={loading}>
-          <h2 id="schedules-title" className="text-[21px] leading-7 font-semibold min-[541px]:text-2xl min-[541px]:leading-8">Programaciones</h2>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 id="schedules-title" className="text-[21px] leading-7 font-semibold min-[541px]:text-2xl min-[541px]:leading-8">Programaciones</h2>
+            <Button size="small" disabled={loading || executing} onClick={executeDue}>{executing ? "Ejecutando…" : "Ejecutar programaciones vencidas"}</Button>
+          </div>
+          <p className="text-xs text-[#68707C]">Inicia ahora todas las programaciones activas cuya fecha ya venció, incluidas las de otras páginas. Las programaciones futuras conservan su fecha.</p>
+          {executionFeedback && <Notice variant={executionFeedback.variant} live>{executionFeedback.message}</Notice>}
           {showData && (data.schedules.results.length ? <AdminTable caption="Programaciones de cosecha" columns={scheduleColumns} rows={data.schedules.results} /> : <Notice>Todavía no hay programaciones de cosecha.</Notice>)}
           {showData && data.schedules.total_pages > 1 && <div className="flex flex-wrap items-center gap-3">
-            <Button variant="quiet" size="small" disabled={schedulePage <= 1} onClick={() => changePage(schedulePage - 1, true)}>Anterior</Button>
+            <Button variant="quiet" size="small" disabled={loading || schedulePage <= 1} onClick={() => changePage(schedulePage - 1, true)}>Anterior</Button>
             <span>Página {schedulePage} de {data.schedules.total_pages} · {data.schedules.total_items} programaciones</span>
-            <Button variant="quiet" size="small" disabled={schedulePage >= data.schedules.total_pages} onClick={() => changePage(schedulePage + 1, true)}>Siguiente</Button>
+            <Button variant="quiet" size="small" disabled={loading || schedulePage >= data.schedules.total_pages} onClick={() => changePage(schedulePage + 1, true)}>Siguiente</Button>
           </div>}
         </section>
       </div>
