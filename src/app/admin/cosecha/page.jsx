@@ -1,3 +1,5 @@
+import HarvestDashboard from "@/features/admin/harvesting/components/HarvestDashboard";
+
 export default function HarvestPage() {
-  return <div>Cosecha</div>;
+  return <HarvestDashboard />;
 }
