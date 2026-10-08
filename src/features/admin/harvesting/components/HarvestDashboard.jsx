@@ -114,7 +114,7 @@ export default function HarvestDashboard() {
             <h2 id="runs-title" className="text-[21px] leading-7 font-semibold min-[541px]:text-2xl min-[541px]:leading-8">Ejecuciones recientes</h2>
             <Button variant="quiet" size="small" disabled={loading} onClick={refresh}>Actualizar</Button>
           </div>
-          {showData && <HarvestExecutions rows={runs} onRefresh={refresh} busy={loading || executing || Boolean(error)} />}
+          {showData && <HarvestExecutions rows={runs} onRefresh={refresh} busy={loading || Boolean(error)} />}
           {showData && data.harvests.total_pages > 1 && <div className="flex flex-wrap items-center gap-3">
             <Button variant="quiet" size="small" disabled={loading || page <= 1} onClick={() => changePage(page - 1)}>Anterior</Button>
             <span>Página {page} de {data.harvests.total_pages} · {data.harvests.total_items} ejecuciones</span>

@@ -144,7 +144,7 @@ export function describeDueRuns(harvests) {
   const failures = harvests.filter((harvest) => harvest.state === "failed");
   return {
     variant: failures.length ? "error" : "neutral",
-    message: `La API devolvió ${harvests.length} ejecuciones; ${failures.length} fallidas. Consulta su estado para comprobar el resultado.${failures.length ? ` ${failures.map((harvest) => `${harvest.platform_name || `Ejecución #${harvest.id}`}: ${harvest.error_message || "La cosecha falló."}`).join(" · ")}` : ""}`,
+    message: `La API devolvió ${harvests.length} ${harvests.length === 1 ? "ejecución" : "ejecuciones"}. ${failures.length ? `${failures.length} ${failures.length === 1 ? "fallida" : "fallidas"}. ` : ""}Consulta su estado para comprobar el resultado.${failures.length ? ` ${failures.map((harvest) => `${harvest.platform_name || `Ejecución #${harvest.id}`}: ${harvest.error_message || "La cosecha falló."}`).join(" · ")}` : ""}`,
   };
 }
 
