@@ -1,4 +1,4 @@
-const apiBaseUrl = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/+$/, "");
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, "");
 
 export class PublicApiError extends Error {
   constructor(message, status) {
@@ -11,6 +11,10 @@ export class PublicApiError extends Error {
 const requestTimeoutMs = 10_000;
 
 export async function fetchPublicApi(path, params = {}, signal) {
+  if (!apiBaseUrl) {
+    throw new PublicApiError("Configura NEXT_PUBLIC_API_URL para conectar con la API pública.");
+  }
+
   const url = new URL(`${apiBaseUrl}${path}`);
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== "") {
