@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Button from "@/shared/components/Button";
 import Notice from "@/shared/components/Notice";
-import { getScheduleHarvests, runDueSchedules } from "@/features/admin/harvesting/harvesting";
+import { getScheduleHarvests, IMMEDIATE_HARVEST_ENABLED, runDueSchedules } from "@/features/admin/harvesting/harvesting";
 import HarvestExecutions from "./HarvestExecutions";
 
 export default function HarvestScheduleRuns({ scheduleId, revision, busy }) {
@@ -45,7 +45,7 @@ export default function HarvestScheduleRuns({ scheduleId, revision, busy }) {
   }
 
   async function updateExecutions() {
-    if (requestPending.current || busy || loading) return;
+    if (!IMMEDIATE_HARVEST_ENABLED || requestPending.current || busy || loading) return;
     requestPending.current = true;
     setExecuting(true);
     setExecutionFeedback(null);
@@ -65,10 +65,10 @@ export default function HarvestScheduleRuns({ scheduleId, revision, busy }) {
     <section className="flex flex-col gap-3.5 rounded-xl border border-[#DCE0E5] bg-white p-5" aria-labelledby="created-runs-title" aria-busy={loading || busy || executing}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 id="created-runs-title" className="text-[21px] leading-7 font-semibold min-[541px]:text-2xl min-[541px]:leading-8">Ejecuciones de la programación #{scheduleId}</h2>
-        <Button variant="quiet" size="small" disabled={loading || busy || executing} onClick={updateExecutions}>{executing ? "Ejecutando…" : "Actualizar ejecuciones"}</Button>
+        <Button variant="quiet" size="small" disabled={!IMMEDIATE_HARVEST_ENABLED || loading || busy || executing} title={IMMEDIATE_HARVEST_ENABLED ? undefined : "Disponible en un próximo sprint"} onClick={updateExecutions}>{executing ? "Ejecutando…" : "Actualizar ejecuciones"}</Button>
       </div>
       <p className="text-xs text-[#68707C]">Estado actualizado cada 5 segundos. Aquí se muestran únicamente las ejecuciones de esta programación.</p>
-      <p className="text-xs text-[#68707C]">Actualizar ejecuciones inicia todas las programaciones vencidas, incluidas las de otras cosechas, y después consulta su estado.</p>
+      {IMMEDIATE_HARVEST_ENABLED && <p className="text-xs text-[#68707C]">Actualizar ejecuciones inicia todas las programaciones vencidas, incluidas las de otras cosechas, y después consulta su estado.</p>}
       {executionFeedback && <Notice variant={executionFeedback.variant} live>{executionFeedback.message}</Notice>}
       {loading && <Notice live>Cargando ejecuciones…</Notice>}
       {error && <Notice variant="error" live>{error}</Notice>}

@@ -1,5 +1,6 @@
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://repositorio-biblioteca-backend.onrender.com").replace(/\/+$/, "");
 export const MAX_HARVEST_LIMIT = 2147483647;
+export const IMMEDIATE_HARVEST_ENABLED = false;
 
 const FIELD_NAMES = {
   platforms: "Plataformas",

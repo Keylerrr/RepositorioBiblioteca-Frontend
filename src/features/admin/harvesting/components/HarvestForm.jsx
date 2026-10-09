@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Button from "@/shared/components/Button";
 import FormField from "@/shared/components/FormField";
 import Notice from "@/shared/components/Notice";
-import { buildSchedule, createSchedule, formatDate, getHarvestSources, getPlatforms, MAX_HARVEST_LIMIT, nextBogotaDate, prepareImmediateSchedule } from "@/features/admin/harvesting/harvesting";
+import { buildSchedule, createSchedule, formatDate, getHarvestSources, getPlatforms, IMMEDIATE_HARVEST_ENABLED, MAX_HARVEST_LIMIT, nextBogotaDate, prepareImmediateSchedule } from "@/features/admin/harvesting/harvesting";
 import HarvestSourceOption from "./HarvestSourceOption";
 import HarvestScheduleRuns from "./HarvestScheduleRuns";
 
@@ -59,6 +59,7 @@ export default function HarvestForm() {
   }, [revision]);
 
   async function prepare(schedule) {
+    if (!IMMEDIATE_HARVEST_ENABLED) return;
     setExecutionFeedback(null);
     setCanRetryPreparation(false);
     try {
@@ -87,6 +88,10 @@ export default function HarvestForm() {
   async function submit(event) {
     event.preventDefault();
     if (requestPending.current || created || loading || sourceError) return;
+    if (mode === "now" && !IMMEDIATE_HARVEST_ENABLED) {
+      setError("La ejecución inmediata estará disponible en un próximo sprint. Selecciona Programar cosecha.");
+      return;
+    }
     setError("");
     try {
       const payload = buildSchedule({ platformId, limit, minutes, mode, startDate, frequency });
@@ -133,7 +138,7 @@ export default function HarvestForm() {
             <section className={panelClasses} aria-labelledby="schedule-title">
               <h2 id="schedule-title" className={headingClasses}>Programación</h2>
               <div className="flex flex-wrap gap-[18px]" role="radiogroup" aria-labelledby="schedule-title">
-                <label className={`flex cursor-pointer items-center gap-[5px] ${mode === "now" ? "text-[#A90D27]" : "text-[#68707C]"}`}><input className={radioClasses} type="radio" name="mode" value="now" checked={mode === "now"} onChange={() => setMode("now")} />Ejecutar una vez ahora</label>
+                <label title={IMMEDIATE_HARVEST_ENABLED ? undefined : "Disponible en un próximo sprint"} className={`flex items-center gap-[5px] ${IMMEDIATE_HARVEST_ENABLED ? "cursor-pointer" : "cursor-not-allowed opacity-60"} ${mode === "now" ? "text-[#A90D27]" : "text-[#68707C]"}`}><input className={radioClasses} type="radio" name="mode" value="now" disabled={!IMMEDIATE_HARVEST_ENABLED} checked={mode === "now"} onChange={() => setMode("now")} />Ejecutar una vez ahora</label>
                 <label className={`flex cursor-pointer items-center gap-[5px] ${mode === "scheduled" ? "text-[#A90D27]" : "text-[#68707C]"}`}><input className={radioClasses} type="radio" name="mode" value="scheduled" checked={mode === "scheduled"} onChange={() => setMode("scheduled")} />Programar cosecha</label>
               </div>
               <div className="grid grid-cols-1 gap-4 min-[901px]:grid-cols-3">
@@ -146,8 +151,8 @@ export default function HarvestForm() {
           {sourceError && <Button variant="quiet" className="self-start" onClick={() => { setLoading(true); setRevision((current) => current + 1); }}>Reintentar carga</Button>}
           <div className="flex flex-wrap items-center gap-3">
             <Button href="/admin/cosecha" variant="quiet" className="w-full min-w-[140px] min-[541px]:w-auto">{created ? "Ver cosechas" : "Cancelar"}</Button>
-            {!created && <Button type="submit" disabled={loading || saving || Boolean(sourceError) || !selectedSource} className="w-full min-w-[210px] min-[541px]:w-auto">{saving ? "Guardando…" : mode === "scheduled" ? "Programar cosecha" : "Guardar cosecha"}</Button>}
-            {created && canRetryPreparation && <Button disabled={saving} onClick={retryPreparation}>{saving ? "Preparando…" : "Reintentar preparación"}</Button>}
+            {!created && <Button type="submit" disabled={loading || saving || Boolean(sourceError) || !selectedSource || (mode === "now" && !IMMEDIATE_HARVEST_ENABLED)} className="w-full min-w-[210px] min-[541px]:w-auto">{saving ? "Guardando…" : mode === "scheduled" ? "Programar cosecha" : "Guardar cosecha"}</Button>}
+            {created && canRetryPreparation && <Button disabled={saving || !IMMEDIATE_HARVEST_ENABLED} onClick={retryPreparation}>{saving ? "Preparando…" : "Reintentar preparación"}</Button>}
             {created && <Button disabled={saving} onClick={() => { setCreated(null); setExecutionFeedback(null); setCanRetryPreparation(false); setStartDate(nextBogotaDate()); }} className="w-full min-[541px]:w-auto">Crear otra cosecha</Button>}
           </div>
           {error && <Notice variant="error" live>{error}</Notice>}
