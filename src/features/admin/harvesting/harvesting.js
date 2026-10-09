@@ -1,4 +1,5 @@
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://repositorio-biblioteca-backend.onrender.com").replace(/\/+$/, "");
+const executedOnceSchedules = new Set();
 
 const FIELD_NAMES = {
   platforms: "Plataformas",
@@ -87,8 +88,18 @@ export function getScheduleHarvests(scheduleId, signal) {
   return listAll("/api/harvesting/harvests/", { schedule: scheduleId, ordering: "-created_at" }, signal);
 }
 
-export function getSchedules(page, signal) {
-  return list("/api/harvesting/schedules/", { page, page_size: 10, ordering: "-created_at" }, signal);
+export async function getUpcomingSchedules(signal) {
+  const schedules = await listAll("/api/harvesting/schedules/", { ordering: "-created_at" }, signal);
+  const unchecked = schedules.filter((schedule) => schedule.frequency === "once" && !executedOnceSchedules.has(schedule.id));
+  // Events are read-only: a once schedule with an event stays consumed for this browser session.
+  // Check only existence, with at most four concurrent reads rather than downloading execution history.
+  for (let index = 0; index < unchecked.length; index += 4) {
+    await Promise.all(unchecked.slice(index, index + 4).map(async (schedule) => {
+      const events = await list("/api/harvesting/events/", { schedule: schedule.id, page_size: 1 }, signal);
+      if (events.results.length) executedOnceSchedules.add(schedule.id);
+    }));
+  }
+  return schedules.filter((schedule) => schedule.frequency !== "once" || !executedOnceSchedules.has(schedule.id));
 }
 
 export function getLinkChecks(signal) {
