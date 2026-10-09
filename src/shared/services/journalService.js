@@ -1,6 +1,15 @@
 import { fetchPublicApi, PublicApiError, readPage } from "@/shared/services/publicApi";
+import { capitalizeWords } from "@/shared/utils/formatText";
 
 const endpoint = "/api/journals/public/";
+
+function capitalizeNamedItems(items) {
+  return (items ?? []).map((item) => (
+    item && typeof item === "object"
+      ? { ...item, name: capitalizeWords(item.name) }
+      : item
+  ));
+}
 
 function displayNames(items) {
   const names = (items ?? []).map((item) => item.name).filter(Boolean);
@@ -13,26 +22,37 @@ function formatPeriod(start, finish) {
 }
 
 function mapJournal(journal) {
-  const url = journal.platforms?.find((platform) => platform.base_api_url)?.base_api_url ?? "";
+  const languages = capitalizeNamedItems(journal.languages);
+  const countries = capitalizeNamedItems(journal.countries);
+  const knowledgeAreas = capitalizeNamedItems(journal.knowledge_areas);
+  const materialTypes = capitalizeNamedItems(journal.material_types);
+  const academicPrograms = capitalizeNamedItems(journal.academic_programs);
+  const platforms = capitalizeNamedItems(journal.platforms);
+
   return {
     ...journal,
-    name: journal.title,
+    title: capitalizeWords(journal.title),
+    editorial_name: capitalizeWords(journal.editorial_name),
+    languages,
+    countries,
+    knowledge_areas: knowledgeAreas,
+    material_types: materialTypes,
+    academic_programs: academicPrograms,
+    platforms,
+    name: capitalizeWords(journal.title),
     description: "",
-    institution: journal.editorial_name ?? "No especificado",
-    country: displayNames(journal.countries),
-    url,
-    access_label: "Abrir plataforma",
-    geographic_coverage: displayNames(journal.countries),
-    language: displayNames(journal.languages),
+    institution: capitalizeWords(journal.editorial_name) ?? "No especificado",
+    country: displayNames(countries),
+    url: "",
+    access_label: "Abrir sitio oficial",
+    geographic_coverage: displayNames(countries),
+    language: displayNames(languages),
     coverage_period: formatPeriod(journal.start_period, journal.finish_period),
-    material_type: displayNames(journal.material_types),
+    material_type: displayNames(materialTypes),
     license: journal.license,
     identifiers: journal.issn ? [{ identifier_type: "ISSN", identifier_value: journal.issn }] : [],
-    links: (journal.platforms ?? [])
-      .filter((platform) => platform.base_api_url)
-      .map((platform) => ({ link_type: platform.name, url: platform.base_api_url })),
-    subject_areas: (journal.knowledge_areas ?? []).map((area) => area.name),
-    academic_programs: (journal.academic_programs ?? []).map((program) => program.name),
+    links: [],
+    subject_areas: knowledgeAreas.map((area) => area.name),
   };
 }
 
