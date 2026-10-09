@@ -3,19 +3,20 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import AdminTable from "@/shared/components/AdminTable";
 import Button from "@/shared/components/Button";
+import FormField from "@/shared/components/FormField";
 import MetricCard from "@/shared/components/MetricCard";
 import Notice from "@/shared/components/Notice";
-import { formatDate, getHarvests, getHarvestSourceCount, getUpcomingSchedules, runDueSchedules } from "@/features/admin/harvesting/harvesting";
+import { deactivateSchedule, formatDate, getHarvests, getHarvestSourceCount, getUpcomingSchedules, runDueSchedules } from "@/features/admin/harvesting/harvesting";
 import HarvestExecutions from "./HarvestExecutions";
 
 const FREQUENCIES = { once: "Única", daily: "Diaria", weekly: "Semanal", monthly: "Mensual" };
 const SCHEDULE_PAGE_SIZE = 10;
 
 const scheduleColumns = [
-  { key: "platforms", label: "FUENTES", width: "30%", render: (row) => row.platform_names?.join(", ") || row.platforms.map((id) => `Plataforma ${id}`).join(", ") },
+  { key: "platforms", label: "FUENTES", width: "25%", render: (row) => row.platform_names?.join(", ") || row.platforms.map((id) => `Plataforma ${id}`).join(", ") },
   { key: "frequency", label: "FRECUENCIA", width: "15%", render: (row) => FREQUENCIES[row.frequency] || row.frequency },
-  { key: "start_date", label: "FECHA INICIAL", width: "25%", muted: true, render: (row) => formatDate(row.start_date) },
-  { key: "limits", label: "LÍMITES POR FUENTE", width: "30%", render: (row) => [
+  { key: "start_date", label: "FECHA INICIAL", width: "20%", muted: true, render: (row) => formatDate(row.start_date) },
+  { key: "limits", label: "LÍMITES POR FUENTE", width: "25%", render: (row) => [
     row.max_quantity == null ? null : `${row.max_quantity} revistas`,
     row.stop_after_minutes == null ? null : `${row.stop_after_minutes} minutos`,
   ].filter(Boolean).join(" · ") },
@@ -69,6 +70,10 @@ export default function HarvestDashboard() {
   const [schedulePage, setSchedulePage] = useState(1);
   const [executing, setExecuting] = useState(false);
   const [executionFeedback, setExecutionFeedback] = useState(null);
+  const [selectedSchedule, setSelectedSchedule] = useState(null);
+  const [explanation, setExplanation] = useState("");
+  const [deactivating, setDeactivating] = useState(false);
+  const [scheduleFeedback, setScheduleFeedback] = useState(null);
   const requestPending = useRef(false);
 
   const loadHarvests = useCallback((signal) => getHarvests(page, signal), [page]);
@@ -105,6 +110,36 @@ export default function HarvestDashboard() {
       upcomingSchedules.refresh();
     }
   }
+
+  async function deactivate(event) {
+    event.preventDefault();
+    if (requestPending.current || upcomingSchedules.loading || !selectedSchedule || !explanation.trim()) return;
+    requestPending.current = true;
+    setDeactivating(true);
+    setScheduleFeedback(null);
+    try {
+      await deactivateSchedule(selectedSchedule.id, explanation);
+      setScheduleFeedback({ variant: "success", message: `Programación #${selectedSchedule.id} desactivada.` });
+      setSelectedSchedule(null);
+      setExplanation("");
+    } catch (error) {
+      setScheduleFeedback({ variant: "error", message: error.message });
+    } finally {
+      requestPending.current = false;
+      setDeactivating(false);
+      upcomingSchedules.refresh();
+    }
+  }
+
+  const columns = [...scheduleColumns, {
+    key: "actions", label: "ACCIONES", width: "15%", render: (row) => (
+      <Button variant="quiet" size="small" disabled={upcomingSchedules.loading || Boolean(upcomingSchedules.error) || executing || deactivating} aria-label={`Desactivar programación #${row.id}`} onClick={() => {
+        setSelectedSchedule(row);
+        setExplanation("");
+        setScheduleFeedback(null);
+      }}>Desactivar</Button>
+    ),
+  }];
 
   function changePage(nextPage, schedules = false) {
     if (schedules) setSchedulePage(nextPage);
@@ -160,14 +195,24 @@ export default function HarvestDashboard() {
         <section className="flex flex-col gap-3.5 rounded-xl border border-[#DCE0E5] bg-white p-5" aria-labelledby="schedules-title" aria-busy={upcomingSchedules.loading}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 id="schedules-title" className="text-[21px] leading-7 font-semibold min-[541px]:text-2xl min-[541px]:leading-8">Programaciones</h2>
-            <Button size="small" disabled={harvests.loading || upcomingSchedules.loading || executing} onClick={executeDue}>{executing ? "Ejecutando…" : "Ejecutar cosechas manualmente"}</Button>
+            <Button size="small" disabled={harvests.loading || upcomingSchedules.loading || executing || deactivating} onClick={executeDue}>{executing ? "Ejecutando…" : "Ejecutar cosechas manualmente"}</Button>
           </div>
           <p className="text-xs text-[#68707C]">Se muestran las programaciones únicas que todavía no se han lanzado y las recurrentes para sus próximas ejecuciones.</p>
           <p className="text-xs text-[#68707C]">Inicia ahora todas las programaciones activas cuya fecha ya venció, incluidas las de otras páginas. Las programaciones futuras conservan su fecha.</p>
           {executionFeedback && <Notice variant={executionFeedback.variant} live>{executionFeedback.message}</Notice>}
           {upcomingSchedules.loading && <Notice live>Cargando programaciones…</Notice>}
           {upcomingSchedules.error && <Notice variant="error" live>{upcomingSchedules.error}</Notice>}
-          {upcomingSchedules.data && (schedules.length ? <AdminTable caption="Programaciones de cosecha pendientes y recurrentes" columns={scheduleColumns} rows={schedules} /> : <Notice>No hay programaciones pendientes de cosecha.</Notice>)}
+          {scheduleFeedback && <Notice variant={scheduleFeedback.variant} live>{scheduleFeedback.message}</Notice>}
+          {upcomingSchedules.data && (schedules.length ? <AdminTable caption="Programaciones de cosecha pendientes y recurrentes" columns={columns} rows={schedules} /> : <Notice>No hay programaciones pendientes de cosecha.</Notice>)}
+          {selectedSchedule && <form onSubmit={deactivate} className="flex flex-col gap-3 rounded-lg border border-[#DCE0E5] p-4" aria-busy={deactivating}>
+            <p className="font-semibold">Desactivar programación #{selectedSchedule.id}</p>
+            <p className="text-xs text-[#68707C]">{selectedSchedule.platform_names?.join(", ")}. Esta programación dejará de generar nuevas ejecuciones. El motivo permite archivarla si tiene registros asociados.</p>
+            <FormField id="schedule-deactivation-reason" label="Motivo de desactivación" required autoFocus disabled={deactivating} value={explanation} onChange={(event) => setExplanation(event.target.value)} />
+            <div className="flex flex-wrap gap-3">
+              <Button type="submit" size="small" disabled={deactivating || executing || upcomingSchedules.loading || !explanation.trim()}>{deactivating ? "Desactivando…" : "Confirmar desactivación"}</Button>
+              <Button variant="quiet" size="small" disabled={deactivating} onClick={() => { setSelectedSchedule(null); setExplanation(""); }}>Cancelar</Button>
+            </div>
+          </form>}
           {upcomingSchedules.data && schedulePages > 1 && <div className="flex flex-wrap items-center gap-3">
             <Button variant="quiet" size="small" disabled={upcomingSchedules.loading || schedulePage <= 1} onClick={() => changePage(schedulePage - 1, true)}>Anterior</Button>
             <span>Página {schedulePage} de {schedulePages} · {scheduleCount} programaciones</span>
