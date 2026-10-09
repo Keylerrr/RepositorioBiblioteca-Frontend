@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { platformService } from "../services/platformService";
 import { capitalizeWords } from "@/lib/utils";
 import DeleteModal from "./DeleteModal";
-import LinkCheckModal from "./LinkCheckModal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { 
@@ -14,18 +13,16 @@ import {
   Edit3, 
   Trash2, 
   Globe, 
-  Key, 
   CheckCircle2, 
   AlertTriangle, 
   Clock, 
   Building2, 
   History,
-  Link2,
   ExternalLink,
   ShieldCheck,
   UserCheck,
   RefreshCw,
-  Plus
+  Link2
 } from "lucide-react";
 
 export default function DatabaseDetail({ platformId }) {
@@ -38,6 +35,7 @@ export default function DatabaseDetail({ platformId }) {
     languages: [],
     countries: [],
     materialTypes: [],
+    knowledgeAreas: [],
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -49,21 +47,20 @@ export default function DatabaseDetail({ platformId }) {
   // Modals
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [linkModalOpen, setLinkModalOpen] = useState(false);
-  const [isCheckingLink, setIsCheckingLink] = useState(false);
 
   // Fetch Detail Data & Catalogs
   const loadDetail = async () => {
     setLoading(true);
     setError(null);
     try {
-      const [data, catData] = await Promise.all([
+      const [data, catData, kaData] = await Promise.all([
         platformService.getPlatformById(platformId),
         platformService.loadFormCatalogs(),
+        platformService.getCatalogData("/api/catalog/knowledge-areas/"),
       ]);
 
       setPlatform(data);
-      setCatalogs(catData);
+      setCatalogs({ ...catData, knowledgeAreas: kaData });
 
       // Load link check logs history
       try {
@@ -146,20 +143,6 @@ export default function DatabaseDetail({ platformId }) {
       alert(`Error al eliminar: ${err.message}`);
     } finally {
       setIsDeleting(false);
-    }
-  };
-
-  const confirmCheckLink = async (url) => {
-    setIsCheckingLink(true);
-    try {
-      await platformService.checkLink(platformId, url);
-      showToast("Verificación de URL ejecutada correctamente.");
-      setLinkModalOpen(false);
-      loadDetail();
-    } catch (err) {
-      alert(`Error al verificar la URL: ${err.message}`);
-    } finally {
-      setIsCheckingLink(false);
     }
   };
 
@@ -259,7 +242,7 @@ export default function DatabaseDetail({ platformId }) {
         </div>
       )}
 
-      {/* Top Bar Navigation & Main Actions (Without Verificar URL button) */}
+      {/* Top Bar Navigation & Main Actions */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-gray-200">
         <div className="flex items-center gap-3">
           <button
@@ -330,7 +313,7 @@ export default function DatabaseDetail({ platformId }) {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Main Details (2 Cols) */}
         <div className="md:col-span-2 space-y-6">
-          {/* Información General Card con mejoras de UI/UX de contraste */}
+          {/* Información General Card */}
           <Card className="rounded-2xl border-gray-200/80 shadow-xs bg-white">
             <CardHeader className="border-b border-gray-100 pb-4">
               <CardTitle className="text-base font-bold text-gray-900 flex items-center gap-2">
@@ -340,6 +323,27 @@ export default function DatabaseDetail({ platformId }) {
             </CardHeader>
             <CardContent className="pt-6 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* URL Pública de Acceso — campo destacado */}
+                <div className="sm:col-span-2">
+                  <span className="text-xs uppercase tracking-wide text-gray-500 font-semibold block">URL Pública de Acceso</span>
+                  <div className="mt-1.5 p-3 bg-blue-50 border border-blue-200/80 rounded-lg flex items-center gap-2">
+                    <Link2 className="w-4 h-4 text-blue-500 shrink-0" />
+                    {platform.public_url ? (
+                      <a
+                        href={platform.public_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="font-semibold text-blue-700 hover:underline text-[14px] sm:text-[15px] break-all flex items-center gap-1.5"
+                      >
+                        {platform.public_url}
+                        <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                      </a>
+                    ) : (
+                      <span className="text-slate-400 italic text-[14px]">Sin URL pública registrada</span>
+                    )}
+                  </div>
+                </div>
+
                 {/* Nombre */}
                 <div>
                   <span className="text-xs uppercase tracking-wide text-gray-500 font-semibold block">Nombre</span>
@@ -405,13 +409,25 @@ export default function DatabaseDetail({ platformId }) {
           <Card className="rounded-2xl border-gray-200/80 shadow-xs bg-white">
             <CardHeader className="border-b border-gray-100 pb-4">
               <CardTitle className="text-base font-bold text-gray-900 flex items-center gap-2">
-                <Key className="w-4 h-4 text-amber-600" />
-                Configuración de API y Cosecha
+                <ExternalLink className="w-4 h-4 text-amber-600" />
+                Configuración de Cosecha
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-6 space-y-4">
+              {/* is_harvestable */}
+              <div className="flex items-center gap-2">
+                <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                  platform.is_harvestable
+                    ? "bg-amber-100 text-amber-800 border border-amber-200"
+                    : "bg-gray-100 text-gray-600 border border-gray-200"
+                }`}>
+                  {platform.is_harvestable ? "Cosechable vía API" : "Solo acceso manual"}
+                </span>
+              </div>
+
+              {/* URL Base de API */}
               <div>
-                <span className="text-xs uppercase tracking-wide text-gray-500 font-semibold block">URL Base de API de cosecha (base_api_url)</span>
+                <span className="text-xs uppercase tracking-wide text-gray-500 font-semibold block">URL Base de API de cosecha</span>
                 <div className="mt-1.5 p-2.5 bg-slate-50 border border-slate-100 rounded-lg">
                   {platform.base_api_url ? (
                     <a
@@ -424,17 +440,8 @@ export default function DatabaseDetail({ platformId }) {
                       <ExternalLink className="w-3.5 h-3.5 shrink-0" />
                     </a>
                   ) : (
-                    <span className="text-slate-400 italic text-[14px]">Sin URL de API configurada (Recurso no cosechable por API)</span>
+                    <span className="text-slate-400 italic text-[14px]">Sin URL de API configurada</span>
                   )}
-                </div>
-              </div>
-
-              <div>
-                <span className="text-xs uppercase tracking-wide text-gray-500 font-semibold block">API Key (Credencial)</span>
-                <div className="mt-1.5 p-2.5 bg-slate-50 border border-slate-100 rounded-lg">
-                  <span className="text-slate-500 italic text-[13px] block font-medium">
-                    [Protegido / Solo Escritura] El backend almacena la clave cifrada de forma segura y no la retorna en lecturas.
-                  </span>
                 </div>
               </div>
             </CardContent>
@@ -453,48 +460,21 @@ export default function DatabaseDetail({ platformId }) {
                 </CardDescription>
               </div>
 
-              {/* Dynamic Buttons based on linkLogs.length */}
-              {linkLogs.length === 0 ? (
-                /* Caso length === 0: Botón principal "Añadir URL Pública" abre modal */
-                <Button
-                  size="sm"
-                  onClick={() => setLinkModalOpen(true)}
-                  className="rounded-xl text-xs bg-[#C8102E] hover:bg-[#A50D25] text-white font-medium gap-1.5 cursor-pointer shadow-2xs"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  Añadir URL Pública
-                </Button>
-              ) : (
-                /* Caso length > 0: Botón "Re-verificar" (sin modal, recarga directa {}) + Botón "Cambiar URL" (modal) */
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setLinkModalOpen(true)}
-                    title="Cambiar o corregir URL pública"
-                    className="rounded-xl text-xs border-gray-200 text-gray-700 hover:bg-gray-100 gap-1 cursor-pointer"
-                  >
-                    <Edit3 className="w-3.5 h-3.5 text-gray-500" />
-                    <span>Cambiar URL</span>
-                  </Button>
-
-                  <Button
-                    size="sm"
-                    disabled={isRechecking}
-                    onClick={handleDirectRecheck}
-                    className="rounded-xl text-xs bg-[#C8102E] hover:bg-[#A50D25] text-white font-medium gap-1.5 cursor-pointer shadow-2xs"
-                  >
-                    <RefreshCw className={`w-3.5 h-3.5 ${isRechecking ? "animate-spin" : ""}`} />
-                    <span>{isRechecking ? "Verificando..." : "Re-verificar"}</span>
-                  </Button>
-                </div>
-              )}
+              <Button
+                size="sm"
+                disabled={isRechecking}
+                onClick={handleDirectRecheck}
+                className="rounded-xl text-xs bg-[#C8102E] hover:bg-[#A50D25] text-white font-medium gap-1.5 cursor-pointer shadow-2xs"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isRechecking ? "animate-spin" : ""}`} />
+                <span>{isRechecking ? "Verificando..." : "Re-verificar URL"}</span>
+              </Button>
             </CardHeader>
 
             <CardContent className="pt-4">
               {linkLogs.length === 0 ? (
                 <div className="py-6 text-center text-gray-400 text-xs">
-                  No hay registros de verificación de enlace aún. Haz clic en "Añadir URL Pública" para registrar una.
+                  No hay registros de verificación de enlace aún.
                 </div>
               ) : (
                 <div className="space-y-2 max-h-56 overflow-y-auto">
@@ -526,7 +506,7 @@ export default function DatabaseDetail({ platformId }) {
 
         {/* Sidebar Cards (1 Col) */}
         <div className="space-y-6">
-          {/* Clasificación y Relaciones Card con mejor contraste */}
+          {/* Clasificación y Relaciones Card */}
           <Card className="rounded-2xl border-gray-200/80 shadow-xs bg-white">
             <CardHeader className="border-b border-gray-100 pb-4">
               <CardTitle className="text-base font-bold text-gray-900 flex items-center gap-2">
@@ -541,17 +521,20 @@ export default function DatabaseDetail({ platformId }) {
                 <div className="mt-1.5 p-2.5 bg-slate-50 border border-slate-100 rounded-lg">
                   {platform.knowledge_areas && platform.knowledge_areas.length > 0 ? (
                     <div className="flex flex-wrap gap-1.5">
-                      {platform.knowledge_areas.map((ka, i) => (
-                        <span
-                          key={i}
-                          className="bg-emerald-50 text-emerald-800 border border-emerald-200/60 font-semibold px-2.5 py-0.5 rounded-md text-xs"
-                        >
-                          {capitalizeWords(typeof ka === "object" ? ka.name : ka)}
-                        </span>
-                      ))}
+                      {platform.knowledge_areas.map((ka, i) => {
+                        const name = formatItemName(ka, catalogs.knowledgeAreas);
+                        return (
+                          <span
+                            key={i}
+                            className="bg-emerald-50 text-emerald-800 border border-emerald-200/60 font-semibold px-2.5 py-0.5 rounded-md text-xs"
+                          >
+                            {name}
+                          </span>
+                        );
+                      })}
                     </div>
                   ) : (
-                    <span className="text-slate-400 italic text-xs">Derivadas automáticamente de los programas</span>
+                    <span className="text-slate-400 italic text-xs">Sin áreas derivadas</span>
                   )}
                 </div>
               </div>
@@ -654,15 +637,7 @@ export default function DatabaseDetail({ platformId }) {
         platformName={platform.name}
         isDeleting={isDeleting}
       />
-
-      {/* Link Check Modal */}
-      <LinkCheckModal
-        isOpen={linkModalOpen}
-        onClose={() => setLinkModalOpen(false)}
-        onConfirm={confirmCheckLink}
-        platform={platform}
-        isChecking={isCheckingLink}
-      />
     </div>
   );
 }
+

@@ -24,13 +24,14 @@ export default function DatabaseForm({ initialData = null, isEdit = false }) {
     languages: [],
     countries: [],
     materialTypes: [],
-    academicPrograms: [],
   });
   const [loadingCatalogs, setLoadingCatalogs] = useState(true);
 
   // Form State (strictly fields of Platform model)
   const [formData, setFormData] = useState({
     name: "",
+    public_url: "",
+    is_harvestable: false,
     base_api_url: "",
     api_key: "",
     url_image: "",
@@ -43,12 +44,12 @@ export default function DatabaseForm({ initialData = null, isEdit = false }) {
     languages: [],
     countries: [],
     material_types: [],
-    academic_programs: [],
   });
 
   const [clearApiKey, setClearApiKey] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
 
   // Load catalogs on mount & prefill form if editing
   useEffect(() => {
@@ -61,6 +62,8 @@ export default function DatabaseForm({ initialData = null, isEdit = false }) {
         if (initialData) {
           setFormData({
             name: initialData.name || "",
+            public_url: initialData.public_url || initialData.url || (initialData.link_logs && initialData.link_logs[0]?.url) || "",
+            is_harvestable: Boolean(initialData.is_harvestable),
             base_api_url: initialData.base_api_url || "",
             api_key: "", // Write-only, never returned by backend
             url_image: initialData.url_image || "",
@@ -75,7 +78,6 @@ export default function DatabaseForm({ initialData = null, isEdit = false }) {
             languages: extractIds(initialData.languages, catData.languages),
             countries: extractIds(initialData.countries, catData.countries),
             material_types: extractIds(initialData.material_types, catData.materialTypes),
-            academic_programs: extractIds(initialData.academic_programs, catData.academicPrograms),
           });
         } else {
           setFormData((prev) => ({
@@ -85,7 +87,6 @@ export default function DatabaseForm({ initialData = null, isEdit = false }) {
             languages: catData.languages.length > 0 ? [catData.languages[0].id] : [1],
             countries: catData.countries.length > 0 ? [catData.countries[0].id] : [1],
             material_types: catData.materialTypes.length > 0 ? [catData.materialTypes[0].id] : [1],
-            academic_programs: catData.academicPrograms.length > 0 ? [catData.academicPrograms[0].id] : [1],
           }));
         }
       } catch (err) {
@@ -120,17 +121,32 @@ export default function DatabaseForm({ initialData = null, isEdit = false }) {
   const handleSubmit = async (e, actionType = "save") => {
     if (e) e.preventDefault();
     setFormError(null);
+    setFieldErrors({});
 
     if (!formData.name.trim()) {
       setFormError("El nombre de la base de datos es obligatorio.");
       return;
     }
 
+    if (!formData.public_url.trim()) {
+      setFormError("La URL pública de acceso es obligatoria.");
+      setFieldErrors({ public_url: "La URL pública es requerida." });
+      return;
+    }
+
     const hasBaseApiUrl = Boolean(formData.base_api_url && formData.base_api_url.trim());
     const hasApiKeyInput = Boolean(formData.api_key && formData.api_key.trim());
 
+    // Si es cosechable, la URL base de API es obligatoria
+    if (formData.is_harvestable && !hasBaseApiUrl) {
+      setFormError("Si la base de datos es cosechable, la URL Base de API es obligatoria.");
+      setFieldErrors({ base_api_url: "Obligatoria cuando 'Cosechable vía API' está activado." });
+      return;
+    }
+
     if (hasApiKeyInput && !hasBaseApiUrl) {
       setFormError("Combinación inválida: No se puede enviar una API Key sin haber especificado la URL base de API (base_api_url).");
+      setFieldErrors({ base_api_url: "URL base de API requerida si especifica una API Key." });
       return;
     }
 
@@ -142,10 +158,13 @@ export default function DatabaseForm({ initialData = null, isEdit = false }) {
     setSubmitting(true);
 
     try {
-      // Build clean payload according to API_de_platforms.docx.txt spec
+      // Build clean payload. public_url is sent natively for the backend to handle.
       const payload = {
         name: formData.name.trim(),
-        base_api_url: formData.base_api_url ? formData.base_api_url.trim() : null,
+        public_url: formData.public_url.trim(),
+        is_harvestable: formData.is_harvestable,
+        // Si no es cosechable, enviar null para evitar HTTP 400 del backend
+        base_api_url: formData.is_harvestable && formData.base_api_url ? formData.base_api_url.trim() : null,
         url_image: formData.url_image ? formData.url_image.trim() : null,
         start_period: formData.start_period || null,
         finish_period: formData.finish_period || null,
@@ -156,14 +175,14 @@ export default function DatabaseForm({ initialData = null, isEdit = false }) {
         languages: formData.languages,
         countries: formData.countries,
         material_types: formData.material_types,
-        academic_programs: formData.academic_programs,
       };
 
-      // Handle api_key UX logic:
-      // If checkbox clearApiKey is checked, explicitly send api_key: null
-      // If not checked and input has text, send api_key string
-      // If untouched, omit api_key from PATCH
-      if (clearApiKey) {
+      // Handle api_key logic:
+      // If not harvestable → always null
+      // If harvestable + clearApiKey checked → null
+      // If harvestable + new text → send the text
+      // If harvestable + untouched in edit → omit from PATCH (don't overwrite)
+      if (!formData.is_harvestable || clearApiKey) {
         payload.api_key = null;
       } else if (hasApiKeyInput) {
         payload.api_key = formData.api_key.trim();
@@ -176,19 +195,27 @@ export default function DatabaseForm({ initialData = null, isEdit = false }) {
         savedPlatform = await platformService.createPlatform(payload);
       }
 
-      const platformId = savedPlatform?.id || initialData?.id;
+      const redirectId = savedPlatform?.id || initialData?.id;
 
-      if (actionType === "publish" && platformId) {
+      if (actionType === "publish" && redirectId) {
         try {
-          await platformService.publishPlatform(platformId);
+          await platformService.publishPlatform(redirectId);
         } catch (pubErr) {
           console.warn("Error en la publicación:", pubErr);
         }
       }
 
-      router.push("/admin/bases-de-datos");
+      // Redirigir al detalle si es edición; a la lista si es creación nueva
+      if (isEdit && redirectId) {
+        router.push(`/admin/bases-de-datos/${redirectId}`);
+      } else {
+        router.push("/admin/bases-de-datos");
+      }
     } catch (err) {
       console.error("Form submit error:", err);
+      if (err.data && typeof err.data === "object") {
+        setFieldErrors(err.data);
+      }
       setFormError(err.message || "Error al guardar la plataforma.");
     } finally {
       setSubmitting(false);
@@ -251,13 +278,21 @@ export default function DatabaseForm({ initialData = null, isEdit = false }) {
               id="name"
               required
               value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              onChange={(e) => {
+                setFormData({ ...formData, name: e.target.value });
+                if (fieldErrors.name) setFieldErrors((prev) => ({ ...prev, name: null }));
+              }}
               placeholder="Nombre de la base de datos (Ej. SciELO)"
               className="border-0 p-0 text-xs shadow-none focus-visible:ring-0 h-6 font-semibold text-gray-900"
             />
+            {fieldErrors.name && (
+              <p className="text-[11px] text-rose-600 font-medium mt-1">
+                {Array.isArray(fieldErrors.name) ? fieldErrors.name.join(", ") : fieldErrors.name}
+              </p>
+            )}
           </div>
 
-          {/* URL de imagen (Strictly text input, NO <img /> render) */}
+          {/* URL de imagen */}
           <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-2xs space-y-1">
             <Label htmlFor="url_image" className="text-[11px] font-medium text-gray-500 block">
               URL de imagen (Texto)
@@ -272,22 +307,80 @@ export default function DatabaseForm({ initialData = null, isEdit = false }) {
             />
           </div>
 
-          {/* base_api_url (Opcional) */}
+          {/* URL Pública (Obligatoria) */}
+          <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-2xs space-y-1 md:col-span-3">
+            <Label htmlFor="public_url" className="text-[11px] font-medium text-gray-500 block">
+              URL Pública de Acceso *
+            </Label>
+            <Input
+              id="public_url"
+              type="url"
+              required
+              value={formData.public_url}
+              onChange={(e) => {
+                setFormData({ ...formData, public_url: e.target.value });
+                if (fieldErrors.public_url) setFieldErrors((prev) => ({ ...prev, public_url: null }));
+              }}
+              placeholder="https://www.scielo.org (Obligatoria)"
+              className="border-0 p-0 text-xs shadow-none focus-visible:ring-0 h-6 text-gray-900 font-semibold"
+            />
+            {fieldErrors.public_url && (
+              <p className="text-[11px] text-rose-600 font-medium mt-1">
+                {Array.isArray(fieldErrors.public_url) ? fieldErrors.public_url.join(", ") : fieldErrors.public_url}
+              </p>
+            )}
+          </div>
+
+          {/* is_harvestable */}
+          <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-2xs space-y-1">
+            <Label htmlFor="is_harvestable" className="text-[11px] font-medium text-gray-500 block">
+              Cosechable vía API
+            </Label>
+            <select
+              id="is_harvestable"
+              value={formData.is_harvestable ? "true" : "false"}
+              onChange={(e) => {
+                const val = e.target.value === "true";
+                setFormData((prev) => ({
+                  ...prev,
+                  is_harvestable: val,
+                  // Limpiar campos de API si se desactiva la cosecha
+                  ...(val === false ? { base_api_url: "", api_key: "" } : {}),
+                }));
+              }}
+              className="w-full text-xs font-semibold text-gray-900 outline-none bg-transparent h-6 cursor-pointer"
+            >
+              <option value="false">No (Solo acceso manual)</option>
+              <option value="true">Sí (Cosechable vía API)</option>
+            </select>
+          </div>
+
+          {/* base_api_url (Obligatoria si is_harvestable) */}
           <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-2xs space-y-1 md:col-span-2">
             <Label htmlFor="base_api_url" className="text-[11px] font-medium text-gray-500 block">
-              URL Base API de cosecha (opcional)
+              URL Base API de cosecha {formData.is_harvestable ? "*" : "(opcional)"}
             </Label>
             <Input
               id="base_api_url"
               type="url"
+              required={formData.is_harvestable}
+              disabled={!formData.is_harvestable}
               value={formData.base_api_url}
-              onChange={(e) => setFormData({ ...formData, base_api_url: e.target.value })}
-              placeholder="https://api.scielo.org/v1/oai (si aplica)"
-              className="border-0 p-0 text-xs shadow-none focus-visible:ring-0 h-6 text-gray-800"
+              onChange={(e) => {
+                setFormData({ ...formData, base_api_url: e.target.value });
+                if (fieldErrors.base_api_url) setFieldErrors((prev) => ({ ...prev, base_api_url: null }));
+              }}
+              placeholder={formData.is_harvestable ? "https://api.scielo.org/v1/oai (obligatoria)" : "Activar cosecha para habilitar"}
+              className="border-0 p-0 text-xs shadow-none focus-visible:ring-0 h-6 text-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
             />
+            {fieldErrors.base_api_url && (
+              <p className="text-[11px] text-rose-600 font-medium mt-1">
+                {Array.isArray(fieldErrors.base_api_url) ? fieldErrors.base_api_url.join(", ") : fieldErrors.base_api_url}
+              </p>
+            )}
           </div>
 
-          {/* API Key (Disabled if clearApiKey is checked) */}
+          {/* API Key (solo si is_harvestable) */}
           <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-2xs space-y-1">
             <Label htmlFor="api_key" className="text-[11px] font-medium text-gray-500 block">
               API Key (opcional)
@@ -299,18 +392,26 @@ export default function DatabaseForm({ initialData = null, isEdit = false }) {
               onChange={(e) => {
                 setClearApiKey(false);
                 setFormData({ ...formData, api_key: e.target.value });
+                if (fieldErrors.api_key) setFieldErrors((prev) => ({ ...prev, api_key: null }));
               }}
-              disabled={clearApiKey}
+              disabled={clearApiKey || !formData.is_harvestable}
               placeholder={
-                clearApiKey
+                !formData.is_harvestable
+                  ? "Activar cosecha para habilitar"
+                  : clearApiKey
                   ? "Clave eliminada (se enviará null al guardar)"
                   : isEdit
                   ? "Clave sin configurar / Escriba para cambiar"
                   : "Sin configurar"
               }
-              className="border-0 p-0 text-xs shadow-none focus-visible:ring-0 h-6 text-gray-800 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+              className="border-0 p-0 text-xs shadow-none focus-visible:ring-0 h-6 text-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
             />
-            {isEdit && (
+            {fieldErrors.api_key && (
+              <p className="text-[11px] text-rose-600 font-medium mt-1">
+                {Array.isArray(fieldErrors.api_key) ? fieldErrors.api_key.join(", ") : fieldErrors.api_key}
+              </p>
+            )}
+            {isEdit && formData.is_harvestable && (
               <label className="flex items-center gap-1.5 text-[10px] text-rose-600 cursor-pointer pt-1 font-medium">
                 <input
                   type="checkbox"
@@ -463,41 +564,7 @@ export default function DatabaseForm({ initialData = null, isEdit = false }) {
           </div>
         </div>
 
-        {/* Programas Académicos (Multi-Selección) */}
-        <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-2xs space-y-2">
-          <div className="flex items-center justify-between">
-            <Label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">
-              Programas académicos vinculados
-            </Label>
-            <span className="text-[10px] text-[#C8102E] font-medium bg-[#C8102E]/10 px-2 py-0.5 rounded-full">
-              Selección múltiple
-            </span>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-44 overflow-y-auto pr-1">
-            {catalogs.academicPrograms.map((prog) => {
-              const isSelected = formData.academic_programs.includes(prog.id);
-              const titleName = capitalizeWords(prog.name);
-              return (
-                <div
-                  key={prog.id}
-                  onClick={() => handleMultiSelectToggle("academic_programs", prog.id)}
-                  className={`flex items-center justify-between p-2 rounded-lg text-xs cursor-pointer border transition-all ${
-                    isSelected
-                      ? "bg-[#C8102E]/5 border-[#C8102E] text-gray-900 font-semibold"
-                      : "bg-gray-50/50 border-gray-200 text-gray-600 hover:bg-gray-100"
-                  }`}
-                >
-                  <span className="truncate">{titleName}</span>
-                  <div className={`w-4 h-4 rounded flex items-center justify-center border shrink-0 ${isSelected ? "bg-[#C8102E] border-[#C8102E] text-white" : "border-gray-300 bg-white"}`}>
-                    {isSelected && <Check className="w-3 h-3" />}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
 
-        {/* Periodo cubierto */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-2xs space-y-1">
             <Label htmlFor="start_period" className="text-[11px] font-medium text-gray-500 block">
@@ -612,18 +679,6 @@ export default function DatabaseForm({ initialData = null, isEdit = false }) {
             className="rounded-xl border-[#C8102E] text-[#C8102E] text-xs px-5 py-2 font-medium hover:bg-[#C8102E]/5 cursor-pointer"
           >
             Guardar borrador
-          </Button>
-
-          <Button
-            type="submit"
-            disabled={submitting}
-            className="rounded-xl bg-[#C8102E] hover:bg-[#A50D25] text-white text-xs font-medium px-6 py-2 shadow-xs cursor-pointer"
-          >
-            {submitting
-              ? "Guardando..."
-              : isEdit
-              ? "Publicar"
-              : "Enviar a validación"}
           </Button>
         </div>
       </div>

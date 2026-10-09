@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { platformService } from "../services/platformService";
 import { capitalizeWords } from "@/lib/utils";
 import DeleteModal from "./DeleteModal";
-import LinkCheckModal from "./LinkCheckModal";
 import { 
   Plus, 
   Search, 
@@ -51,9 +50,6 @@ export default function DatabaseTable() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [selectedPlatform, setSelectedPlatform] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
-
-  const [linkModalOpen, setLinkModalOpen] = useState(false);
-  const [isCheckingLink, setIsCheckingLink] = useState(false);
 
   // Debounce handler (400ms delay) to prevent firing fetch on every keypress
   useEffect(() => {
@@ -175,22 +171,6 @@ export default function DatabaseTable() {
       alert(`Error al eliminar: ${err.message}`);
     } finally {
       setIsDeleting(false);
-    }
-  };
-
-  const confirmCheckLink = async (url) => {
-    if (!selectedPlatform) return;
-    setIsCheckingLink(true);
-    try {
-      await platformService.checkLink(selectedPlatform.id, url);
-      showSuccess(`Verificación de URL completada para "${selectedPlatform.name}".`);
-      setLinkModalOpen(false);
-      setSelectedPlatform(null);
-      fetchPlatforms();
-    } catch (err) {
-      alert(`Error al verificar la URL: ${err.message}`);
-    } finally {
-      setIsCheckingLink(false);
     }
   };
 
@@ -404,9 +384,9 @@ export default function DatabaseTable() {
                       <td className="py-4 px-6 font-semibold text-gray-900">
                         <div>
                           <span className="block font-semibold text-gray-900">{capitalizeWords(platform.name)}</span>
-                          {platform.base_api_url && (
-                            <span className="text-[10px] text-gray-400 block font-mono truncate max-w-[220px]">
-                              {platform.base_api_url}
+                          {platform.public_url && (
+                            <span className="text-[10px] text-blue-500 block font-mono truncate max-w-[220px]">
+                              {platform.public_url}
                             </span>
                           )}
                         </div>
@@ -440,25 +420,11 @@ export default function DatabaseTable() {
                           <Link href={`/admin/bases-de-datos/${platform.id}?edit=true`}>
                             <button
                               title="Editar información de la plataforma"
-                              className="p-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-[#C8102E] hover:text-white hover:border-[#C8102E] transition-all cursor-pointer"
+                              className="p-1.5 rounded-lg border border-blue-200 text-blue-600 hover:bg-[#C8102E] hover:text-white hover:border-[#C8102E] transition-all cursor-pointer"
                             >
                               <Edit3 className="w-4 h-4" />
                             </button>
                           </Link>
-
-                          {/* Verificar Link (Enlace) */}
-                          {statusFilter !== "archived" && (
-                            <button
-                              onClick={() => {
-                                setSelectedPlatform(platform);
-                                setLinkModalOpen(true);
-                              }}
-                              title="Verificar URL pública"
-                              className="p-1.5 rounded-lg border border-gray-200 text-blue-600 hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all cursor-pointer"
-                            >
-                              <Link2 className="w-4 h-4" />
-                            </button>
-                          )}
 
                           {/* Acciones según Estado */}
                           {statusFilter === "archived" ? (
@@ -566,17 +532,6 @@ export default function DatabaseTable() {
         isDeleting={isDeleting}
       />
 
-      {/* Link Check Modal */}
-      <LinkCheckModal
-        isOpen={linkModalOpen}
-        onClose={() => {
-          setLinkModalOpen(false);
-          setSelectedPlatform(null);
-        }}
-        onConfirm={confirmCheckLink}
-        platform={selectedPlatform}
-        isChecking={isCheckingLink}
-      />
     </div>
   );
 }
