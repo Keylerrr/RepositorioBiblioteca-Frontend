@@ -41,9 +41,3 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-
-API_de_journal.docx.md
-API_de_platforms.docx.md
-API_del_catalogo.docx.md
-AGENTS.md
-CLAUDE.md
