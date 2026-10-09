@@ -1,12 +1,18 @@
 import Image from "next/image";
 import Link from "next/link";
+import { Source_Sans_3 } from "next/font/google";
 import { Suspense } from "react";
 import PublicNavigation from "@/shared/layouts/PublicNavigation";
 
+const sourceSans = Source_Sans_3({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+});
+
 export default function PublicLayout({ children }) {
   return (
-    <div className="flex min-h-screen flex-col bg-background text-foreground">
-      <header className="relative z-20 bg-wine-dark text-white">
+    <div className={`${sourceSans.className} flex min-h-screen flex-col bg-[#faf7f4] text-[#1f1a1a]`}>
+      <header className="relative z-20 bg-[#7f1218] text-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 sm:px-8">
           <div className="flex items-center gap-3 py-2 sm:gap-4">
             <Image
@@ -33,7 +39,13 @@ export default function PublicLayout({ children }) {
         </div>
       </header>
       {children}
-      <footer className="public-footer mt-auto border-t-[3px] border-primary text-footer-text">
+      <footer
+        className="mt-auto border-t-[3px] border-[#a3141c] bg-[#212121] text-[#d4d4d4]"
+        style={{
+          backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.06) 0.8px, transparent 1px)",
+          backgroundSize: "8px 8px",
+        }}
+      >
         <div className="mx-auto flex max-w-7xl flex-col items-start gap-5 px-5 py-7 sm:flex-row sm:items-center sm:justify-between sm:px-8">
           <div className="flex items-center gap-4">
             <Image
@@ -53,7 +65,7 @@ export default function PublicLayout({ children }) {
           </div>
           <Link
             href="/directorio"
-            className="rounded-sm text-sm font-semibold text-footer-text transition hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
+            className="rounded-sm text-sm font-semibold text-[#d4d4d4] transition hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
           >
             Ir al directorio →
           </Link>

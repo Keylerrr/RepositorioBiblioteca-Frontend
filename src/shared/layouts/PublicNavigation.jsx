@@ -32,7 +32,7 @@ export default function PublicNavigation() {
       <nav
         id="public-navigation"
         aria-label="Navegación principal"
-        className={`${isOpen ? "block" : "hidden"} absolute inset-x-0 top-full bg-wine-dark px-5 pb-4 lg:static lg:block lg:bg-transparent lg:p-0`}
+        className={`${isOpen ? "block" : "hidden"} absolute inset-x-0 top-full bg-[#7f1218] px-5 pb-4 lg:static lg:block lg:bg-transparent lg:p-0`}
       >
         <ul className="flex flex-col gap-1 lg:flex-row lg:items-center lg:gap-7">
           {links.map(({ href, label, tipo }) => {
@@ -48,7 +48,7 @@ export default function PublicNavigation() {
                   onClick={() => setIsOpen(false)}
                   className={`inline-flex min-h-11 items-center border-b-2 px-1 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${
                     isActive
-                      ? "border-sand text-white"
+                      ? "border-[#c9a45c] text-white"
                       : "border-transparent text-white/85 hover:border-white/60 hover:text-white"
                   }`}
                 >
