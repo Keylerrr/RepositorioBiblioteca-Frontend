@@ -1,4 +1,6 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, "");
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://repositorio-biblioteca-backend.onrender.com").replace(/\/+$/, "");
+export const MAX_HARVEST_LIMIT = 2147483647;
+export const IMMEDIATE_HARVEST_ENABLED = false;
 
 const FIELD_NAMES = {
   platforms: "Plataformas",
@@ -6,6 +8,7 @@ const FIELD_NAMES = {
   start_date: "Fecha inicial",
   max_quantity: "Límite de revistas",
   stop_after_minutes: "Límite de tiempo",
+  delete_explanation: "Motivo de desactivación",
   url: "URL",
   non_field_errors: "Validación",
 };
@@ -30,9 +33,9 @@ function errorMessage(payload, status) {
   return `La API respondió con un error (${status}). Intenta nuevamente.`;
 }
 
-async function request(path, { method = "GET", body, signal } = {}) {
-  if (!API_URL) throw new Error("No está configurada la dirección de la API (NEXT_PUBLIC_API_URL).");
-  const timeoutSignal = AbortSignal.timeout(method === "GET" ? 30000 : 90000);
+async function request(path, { method = "GET", body, signal, timeoutMs = method === "GET" ? 30000 : 90000, expectJson = true } = {}) {
+  const timeoutSignal = timeoutMs === null ? null : AbortSignal.timeout(timeoutMs);
+  const signals = [signal, timeoutSignal].filter(Boolean);
   try {
     const response = await fetch(`${API_URL}${path}`, {
       method,
@@ -41,16 +44,17 @@ async function request(path, { method = "GET", body, signal } = {}) {
         "Content-Type": "application/json",
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-      signal: signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal,
+      signal: signals.length ? AbortSignal.any(signals) : undefined,
       cache: "no-store",
     });
+    if (response.ok && !expectJson) return;
     const payload = await response.json().catch(() => null);
     if (!response.ok) throw new ApiError(errorMessage(payload, response.status), response.status, payload);
     if (payload === null) throw new Error("La API devolvió una respuesta que no se pudo leer.");
     return payload;
   } catch (error) {
     if (signal?.aborted) throw error;
-    if (timeoutSignal.aborted) throw new Error("La API tardó demasiado en responder. Actualiza la vista antes de repetir una acción para comprobar si se guardó.");
+    if (timeoutSignal?.aborted) throw new Error("La API tardó demasiado en responder. Actualiza la vista antes de repetir una acción para comprobar si se guardó.");
     if (error instanceof TypeError) throw new Error("No se pudo conectar con la API. Revisa tu conexión e intenta nuevamente.");
     throw error;
   }
@@ -78,12 +82,26 @@ export function getPlatforms(signal) {
   return listAll("/api/platforms/", { ordering: "name" }, signal);
 }
 
+export async function getHarvestSourceCount(signal) {
+  const page = await list("/api/platforms/", { is_harvestable: true, page: 1, page_size: 1 }, signal);
+  return page.total_items;
+}
+
 export function getHarvests(page, signal) {
   return list("/api/harvesting/harvests/", { page, page_size: 10, ordering: "-created_at" }, signal);
 }
 
-export function getSchedules(page, signal) {
-  return list("/api/harvesting/schedules/", { page, page_size: 10, ordering: "-created_at" }, signal);
+export function getScheduleHarvests(scheduleId, signal) {
+  return listAll("/api/harvesting/harvests/", { schedule: scheduleId, ordering: "-created_at" }, signal);
+}
+
+export async function getUpcomingSchedules(signal) {
+  const [schedules, events] = await Promise.all([
+    listAll("/api/harvesting/schedules/", { ordering: "-created_at" }, signal),
+    listAll("/api/harvesting/events/", { ordering: "-scheduled_for" }, signal),
+  ]);
+  const executedOnceSchedules = new Set(events.map((event) => event.schedule));
+  return schedules.filter((schedule) => schedule.frequency !== "once" || !executedOnceSchedules.has(schedule.id));
 }
 
 export function getLinkChecks(signal) {
@@ -121,12 +139,51 @@ export function createSchedule(payload) {
   return request("/api/harvesting/schedules/", { method: "POST", body: payload });
 }
 
+export function deactivateSchedule(id, explanation) {
+  return request(`/api/harvesting/schedules/${id}/`, {
+    method: "DELETE",
+    body: { delete_explanation: explanation.trim() },
+    expectJson: false,
+  });
+}
+
+export function buildImmediateScheduleUpdate(schedule) {
+  if (!schedule?.created_at || !Number.isFinite(Date.parse(schedule.created_at))) {
+    throw new Error("La API no devolvió una fecha de creación válida. Actualiza la programación antes de reintentar su inicio.");
+  }
+  // Use the backend's own timestamp so browser clock drift cannot postpone an immediate run.
+  return { start_date: schedule.created_at };
+}
+
+export function prepareImmediateSchedule(schedule) {
+  return request(`/api/harvesting/schedules/${schedule.id}/`, {
+    method: "PATCH",
+    body: buildImmediateScheduleUpdate(schedule),
+  });
+}
+
+export function runDueSchedules() {
+  // Accept successful responses without a body; execution state comes from GET /harvests/.
+  return request("/api/harvesting/schedules/run-due/", { method: "POST", timeoutMs: null, expectJson: false });
+}
+
+export function pauseHarvest(id) {
+  return request(`/api/harvesting/harvests/${id}/pause/`, { method: "POST" });
+}
+
+export function resumeHarvest(id) {
+  return request(`/api/harvesting/harvests/${id}/resume/`, { method: "POST", timeoutMs: null });
+}
+
 export function buildSchedule({ platformId, limit, minutes, mode, startDate, frequency }, now = new Date()) {
   const maxQuantity = limit === "" ? null : Number(limit);
   const stopAfterMinutes = minutes === "" ? null : Number(minutes);
   for (const value of [maxQuantity, stopAfterMinutes]) {
     if (value !== null && (!Number.isSafeInteger(value) || value <= 0)) {
       throw new Error("Los límites deben ser números enteros mayores que cero.");
+    }
+    if (value !== null && value > MAX_HARVEST_LIMIT) {
+      throw new Error(`Los límites no pueden superar ${MAX_HARVEST_LIMIT} (máximo permitido por la API).`);
     }
   }
   if (maxQuantity === null && stopAfterMinutes === null) throw new Error("Indica al menos un límite: revistas o tiempo.");

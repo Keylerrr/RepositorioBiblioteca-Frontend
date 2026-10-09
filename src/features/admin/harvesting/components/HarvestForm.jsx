@@ -4,10 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import Button from "@/shared/components/Button";
 import FormField from "@/shared/components/FormField";
 import Notice from "@/shared/components/Notice";
-import { buildSchedule, createSchedule, formatDate, getHarvestSources, getPlatforms, nextBogotaDate } from "@/features/admin/harvesting/harvesting";
+import { buildSchedule, createSchedule, formatDate, getHarvestSources, getPlatforms, IMMEDIATE_HARVEST_ENABLED, MAX_HARVEST_LIMIT, nextBogotaDate, prepareImmediateSchedule } from "@/features/admin/harvesting/harvesting";
 import HarvestSourceOption from "./HarvestSourceOption";
+import HarvestScheduleRuns from "./HarvestScheduleRuns";
 
 const frequencies = [
+  { value: "once", label: "Única vez" },
   { value: "daily", label: "Diaria" },
   { value: "weekly", label: "Semanal" },
   { value: "monthly", label: "Mensual" },
@@ -30,6 +32,9 @@ export default function HarvestForm() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [created, setCreated] = useState(null);
+  const [executionFeedback, setExecutionFeedback] = useState(null);
+  const [canRetryPreparation, setCanRetryPreparation] = useState(false);
+  const [runsRevision, setRunsRevision] = useState(0);
   const requestPending = useRef(false);
 
   useEffect(() => {
@@ -54,9 +59,40 @@ export default function HarvestForm() {
     return () => controller.abort();
   }, [revision]);
 
+  async function prepare(schedule) {
+    if (!IMMEDIATE_HARVEST_ENABLED) return;
+    setExecutionFeedback(null);
+    setCanRetryPreparation(false);
+    try {
+      setCreated(await prepareImmediateSchedule(schedule));
+      setExecutionFeedback({ variant: "neutral", message: "Programación lista. Pulsa Actualizar ejecuciones para ejecutar las programaciones vencidas y consultar su estado." });
+    } catch (error) {
+      setExecutionFeedback({ variant: "error", message: `La programación quedó guardada, pero no se pudo ajustar su fecha de inicio. ${error.message}` });
+      setCanRetryPreparation(true);
+    } finally {
+      setRunsRevision((current) => current + 1);
+    }
+  }
+
+  async function retryPreparation() {
+    if (requestPending.current || !created) return;
+    requestPending.current = true;
+    setSaving(true);
+    try {
+      await prepare(created);
+    } finally {
+      requestPending.current = false;
+      setSaving(false);
+    }
+  }
+
   async function submit(event) {
     event.preventDefault();
     if (requestPending.current || created || loading || sourceError) return;
+    if (mode === "now" && !IMMEDIATE_HARVEST_ENABLED) {
+      setError("La ejecución inmediata estará disponible en un próximo sprint. Selecciona Programar cosecha.");
+      return;
+    }
     setError("");
     try {
       const payload = buildSchedule({ platformId, limit, minutes, mode, startDate, frequency });
@@ -64,6 +100,7 @@ export default function HarvestForm() {
       setSaving(true);
       const schedule = await createSchedule(payload);
       setCreated(schedule);
+      if (mode === "now") await prepare(schedule);
     } catch (error) {
       setError(error.message);
     } finally {
@@ -94,15 +131,15 @@ export default function HarvestForm() {
             <section className={panelClasses} aria-labelledby="limits-title">
               <h2 id="limits-title" className={headingClasses}>Límites de ejecución</h2>
               <div className="grid grid-cols-1 gap-4 min-[541px]:grid-cols-2">
-                <FormField id="harvest-limit" label="Límite máximo de revistas" type="number" min="1" step="1" value={limit} onChange={(event) => setLimit(event.target.value)} suffix="revistas" />
-                <FormField id="harvest-minutes" label="Límite de tiempo" type="number" min="1" step="1" value={minutes} onChange={(event) => setMinutes(event.target.value)} suffix="minutos" />
+                <FormField id="harvest-limit" label="Límite máximo de revistas" type="number" min="1" max={MAX_HARVEST_LIMIT} step="1" value={limit} onChange={(event) => setLimit(event.target.value)} suffix="revistas" />
+                <FormField id="harvest-minutes" label="Límite de tiempo" type="number" min="1" max={MAX_HARVEST_LIMIT} step="1" value={minutes} onChange={(event) => setMinutes(event.target.value)} suffix="minutos" />
               </div>
               <p className="text-xs text-[#68707C]">Indica al menos un límite. Si completas ambos, la cosecha se detiene al alcanzar el primero.</p>
             </section>
             <section className={panelClasses} aria-labelledby="schedule-title">
               <h2 id="schedule-title" className={headingClasses}>Programación</h2>
               <div className="flex flex-wrap gap-[18px]" role="radiogroup" aria-labelledby="schedule-title">
-                <label className={`flex cursor-pointer items-center gap-[5px] ${mode === "now" ? "text-[#A90D27]" : "text-[#68707C]"}`}><input className={radioClasses} type="radio" name="mode" value="now" checked={mode === "now"} onChange={() => setMode("now")} />Ejecutar una vez ahora</label>
+                <label title={IMMEDIATE_HARVEST_ENABLED ? undefined : "Disponible en un próximo sprint"} className={`flex items-center gap-[5px] ${IMMEDIATE_HARVEST_ENABLED ? "cursor-pointer" : "cursor-not-allowed opacity-60"} ${mode === "now" ? "text-[#A90D27]" : "text-[#68707C]"}`}><input className={radioClasses} type="radio" name="mode" value="now" disabled={!IMMEDIATE_HARVEST_ENABLED} checked={mode === "now"} onChange={() => setMode("now")} />Ejecutar una vez ahora</label>
                 <label className={`flex cursor-pointer items-center gap-[5px] ${mode === "scheduled" ? "text-[#A90D27]" : "text-[#68707C]"}`}><input className={radioClasses} type="radio" name="mode" value="scheduled" checked={mode === "scheduled"} onChange={() => setMode("scheduled")} />Programar cosecha</label>
               </div>
               <div className="grid grid-cols-1 gap-4 min-[901px]:grid-cols-3">
@@ -111,17 +148,20 @@ export default function HarvestForm() {
                 <FormField id="harvest-timezone" label="Zona horaria" value="America/Bogota" readOnly />
               </div>
             </section>
-            <Notice>{selectedSource ? `La cosecha de ${selectedSource.name}` : "La cosecha"} tendrá {limit ? `un límite de ${limit} revistas` : "límite por tiempo"}{minutes ? ` y hasta ${minutes} minutos` : ""}. La ejecución se procesará en el backend.</Notice>
           </fieldset>
           {sourceError && <Button variant="quiet" className="self-start" onClick={() => { setLoading(true); setRevision((current) => current + 1); }}>Reintentar carga</Button>}
           <div className="flex flex-wrap items-center gap-3">
             <Button href="/admin/cosecha" variant="quiet" className="w-full min-w-[140px] min-[541px]:w-auto">{created ? "Ver cosechas" : "Cancelar"}</Button>
-            {!created && <Button type="submit" disabled={loading || saving || Boolean(sourceError) || !selectedSource} className="w-full min-w-[210px] min-[541px]:w-auto">{saving ? "Guardando…" : mode === "scheduled" ? "Programar cosecha" : "Ejecutar cosecha"}</Button>}
-            {created && <Button onClick={() => { setCreated(null); setStartDate(nextBogotaDate()); }} className="w-full min-[541px]:w-auto">Crear otra cosecha</Button>}
+            {!created && <Button type="submit" disabled={loading || saving || Boolean(sourceError) || !selectedSource || (mode === "now" && !IMMEDIATE_HARVEST_ENABLED)} className="w-full min-w-[210px] min-[541px]:w-auto">{saving ? "Guardando…" : mode === "scheduled" ? "Programar cosecha" : "Guardar cosecha"}</Button>}
+            {created && canRetryPreparation && <Button disabled={saving || !IMMEDIATE_HARVEST_ENABLED} onClick={retryPreparation}>{saving ? "Preparando…" : "Reintentar preparación"}</Button>}
+            {created && <Button disabled={saving} onClick={() => { setCreated(null); setExecutionFeedback(null); setCanRetryPreparation(false); setStartDate(nextBogotaDate()); }} className="w-full min-[541px]:w-auto">Crear otra cosecha</Button>}
           </div>
           {error && <Notice variant="error" live>{error}</Notice>}
-          {created && <Notice variant="success" live>Programación #{created.id} guardada. Inicio: {formatDate(created.start_date)} (America/Bogota). El backend ejecutará la cosecha; su creación no significa que ya haya terminado.</Notice>}
+          {created && <Notice variant="success" live>Programación #{created.id} guardada. Inicio: {formatDate(created.start_date)} (America/Bogota). {created.frequency === "once" ? "Consulta abajo el estado de la ejecución." : "El backend ejecutará la cosecha en la fecha programada."} Guardar la programación no significa que la cosecha haya terminado.</Notice>}
+          {created && saving && <Notice live>Preparando la programación…</Notice>}
+          {executionFeedback && <Notice variant={executionFeedback.variant} live>{executionFeedback.message}</Notice>}
         </form>
+        {created?.frequency === "once" && <HarvestScheduleRuns key={created.id} scheduleId={created.id} revision={runsRevision} busy={saving || canRetryPreparation} />}
       </div>
     </div>
   );
