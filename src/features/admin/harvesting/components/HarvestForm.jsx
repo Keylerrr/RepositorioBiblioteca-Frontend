@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Button from "@/shared/components/Button";
 import FormField from "@/shared/components/FormField";
 import Notice from "@/shared/components/Notice";
-import { buildSchedule, createSchedule, describeDueRuns, formatDate, getHarvestSources, getPlatforms, nextBogotaDate, prepareImmediateSchedule, runDueSchedules } from "@/features/admin/harvesting/harvesting";
+import { buildSchedule, createSchedule, formatDate, getHarvestSources, getPlatforms, nextBogotaDate, prepareImmediateSchedule, runDueSchedules } from "@/features/admin/harvesting/harvesting";
 import HarvestSourceOption from "./HarvestSourceOption";
 import HarvestScheduleRuns from "./HarvestScheduleRuns";
 
@@ -63,7 +63,8 @@ export default function HarvestForm() {
     setCanRetryStart(false);
     try {
       setCreated(await prepareImmediateSchedule(schedule));
-      setExecutionFeedback(describeDueRuns(await runDueSchedules()));
+      await runDueSchedules();
+      setExecutionFeedback({ variant: "neutral", message: "Solicitud de ejecución procesada. Consulta abajo el estado actualizado de tu cosecha." });
     } catch (error) {
       setExecutionFeedback({ variant: "error", message: `La programación quedó guardada, pero no se pudo confirmar el inicio. ${error.message} Revisa las ejecuciones antes de reintentar.` });
       setCanRetryStart(true);

@@ -30,7 +30,7 @@ function errorMessage(payload, status) {
   return `La API respondió con un error (${status}). Intenta nuevamente.`;
 }
 
-async function request(path, { method = "GET", body, signal, timeoutMs = method === "GET" ? 30000 : 90000 } = {}) {
+async function request(path, { method = "GET", body, signal, timeoutMs = method === "GET" ? 30000 : 90000, expectJson = true } = {}) {
   const timeoutSignal = timeoutMs === null ? null : AbortSignal.timeout(timeoutMs);
   const signals = [signal, timeoutSignal].filter(Boolean);
   try {
@@ -44,6 +44,7 @@ async function request(path, { method = "GET", body, signal, timeoutMs = method 
       signal: signals.length ? AbortSignal.any(signals) : undefined,
       cache: "no-store",
     });
+    if (response.ok && !expectJson) return;
     const payload = await response.json().catch(() => null);
     if (!response.ok) throw new ApiError(errorMessage(payload, response.status), response.status, payload);
     if (payload === null) throw new Error("La API devolvió una respuesta que no se pudo leer.");
@@ -140,11 +141,9 @@ export function prepareImmediateSchedule(schedule) {
   });
 }
 
-export async function runDueSchedules() {
-  // These endpoints can return after harvesting finishes; keep polling while the request is open.
-  const harvests = await request("/api/harvesting/schedules/run-due/", { method: "POST", timeoutMs: null });
-  if (!Array.isArray(harvests)) throw new Error("La API no devolvió un resultado válido. Actualiza las ejecuciones antes de intentarlo nuevamente.");
-  return harvests;
+export function runDueSchedules() {
+  // Accept successful responses without a body; execution state comes from GET /harvests/.
+  return request("/api/harvesting/schedules/run-due/", { method: "POST", timeoutMs: null, expectJson: false });
 }
 
 export function pauseHarvest(id) {
@@ -153,15 +152,6 @@ export function pauseHarvest(id) {
 
 export function resumeHarvest(id) {
   return request(`/api/harvesting/harvests/${id}/resume/`, { method: "POST", timeoutMs: null });
-}
-
-export function describeDueRuns(harvests) {
-  if (!harvests.length) return { variant: "neutral", message: "La API no devolvió nuevas ejecuciones. Consulta el estado actualizado de las cosechas; puede que no hubiera programaciones vencidas por ejecutar." };
-  const failures = harvests.filter((harvest) => harvest.state === "failed");
-  return {
-    variant: failures.length ? "error" : "neutral",
-    message: `La API devolvió ${harvests.length} ${harvests.length === 1 ? "ejecución" : "ejecuciones"}. ${failures.length ? `${failures.length} ${failures.length === 1 ? "fallida" : "fallidas"}. ` : ""}Consulta su estado para comprobar el resultado.${failures.length ? ` ${failures.map((harvest) => `${harvest.platform_name || `Ejecución #${harvest.id}`}: ${harvest.error_message || "La cosecha falló."}`).join(" · ")}` : ""}`,
-  };
 }
 
 export function buildSchedule({ platformId, limit, minutes, mode, startDate, frequency }, now = new Date()) {

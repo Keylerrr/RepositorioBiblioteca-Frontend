@@ -5,7 +5,7 @@ import AdminTable from "@/shared/components/AdminTable";
 import Button from "@/shared/components/Button";
 import MetricCard from "@/shared/components/MetricCard";
 import Notice from "@/shared/components/Notice";
-import { describeDueRuns, formatDate, getHarvests, getHarvestSources, getPlatforms, getSchedules, runDueSchedules } from "@/features/admin/harvesting/harvesting";
+import { formatDate, getHarvests, getHarvestSources, getPlatforms, getSchedules, runDueSchedules } from "@/features/admin/harvesting/harvesting";
 import HarvestExecutions from "./HarvestExecutions";
 
 const FREQUENCIES = { once: "Única", daily: "Diaria", weekly: "Semanal", monthly: "Mensual" };
@@ -69,7 +69,8 @@ export default function HarvestDashboard() {
     setExecuting(true);
     setExecutionFeedback(null);
     try {
-      setExecutionFeedback(describeDueRuns(await runDueSchedules()));
+      await runDueSchedules();
+      setExecutionFeedback({ variant: "neutral", message: "Solicitud de ejecución procesada. Consulta el estado actualizado en las ejecuciones." });
     } catch (error) {
       setExecutionFeedback({ variant: "error", message: error.message });
     } finally {
