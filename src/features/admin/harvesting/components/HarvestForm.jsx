@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Button from "@/shared/components/Button";
 import FormField from "@/shared/components/FormField";
 import Notice from "@/shared/components/Notice";
-import { buildSchedule, createSchedule, formatDate, getHarvestSources, getPlatforms, nextBogotaDate, prepareImmediateSchedule } from "@/features/admin/harvesting/harvesting";
+import { buildSchedule, createSchedule, formatDate, getHarvestSources, getPlatforms, MAX_HARVEST_LIMIT, nextBogotaDate, prepareImmediateSchedule } from "@/features/admin/harvesting/harvesting";
 import HarvestSourceOption from "./HarvestSourceOption";
 import HarvestScheduleRuns from "./HarvestScheduleRuns";
 
@@ -125,8 +125,8 @@ export default function HarvestForm() {
             <section className={panelClasses} aria-labelledby="limits-title">
               <h2 id="limits-title" className={headingClasses}>Límites de ejecución</h2>
               <div className="grid grid-cols-1 gap-4 min-[541px]:grid-cols-2">
-                <FormField id="harvest-limit" label="Límite máximo de revistas" type="number" min="1" step="1" value={limit} onChange={(event) => setLimit(event.target.value)} suffix="revistas" />
-                <FormField id="harvest-minutes" label="Límite de tiempo" type="number" min="1" step="1" value={minutes} onChange={(event) => setMinutes(event.target.value)} suffix="minutos" />
+                <FormField id="harvest-limit" label="Límite máximo de revistas" type="number" min="1" max={MAX_HARVEST_LIMIT} step="1" value={limit} onChange={(event) => setLimit(event.target.value)} suffix="revistas" />
+                <FormField id="harvest-minutes" label="Límite de tiempo" type="number" min="1" max={MAX_HARVEST_LIMIT} step="1" value={minutes} onChange={(event) => setMinutes(event.target.value)} suffix="minutos" />
               </div>
               <p className="text-xs text-[#68707C]">Indica al menos un límite. Si completas ambos, la cosecha se detiene al alcanzar el primero.</p>
             </section>

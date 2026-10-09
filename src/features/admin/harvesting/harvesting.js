@@ -1,4 +1,5 @@
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://repositorio-biblioteca-backend.onrender.com").replace(/\/+$/, "");
+export const MAX_HARVEST_LIMIT = 2147483647;
 
 const FIELD_NAMES = {
   platforms: "Plataformas",
@@ -165,6 +166,9 @@ export function buildSchedule({ platformId, limit, minutes, mode, startDate, fre
   for (const value of [maxQuantity, stopAfterMinutes]) {
     if (value !== null && (!Number.isSafeInteger(value) || value <= 0)) {
       throw new Error("Los límites deben ser números enteros mayores que cero.");
+    }
+    if (value !== null && value > MAX_HARVEST_LIMIT) {
+      throw new Error(`Los límites no pueden superar ${MAX_HARVEST_LIMIT} (máximo permitido por la API).`);
     }
   }
   if (maxQuantity === null && stopAfterMinutes === null) throw new Error("Indica al menos un límite: revistas o tiempo.");
