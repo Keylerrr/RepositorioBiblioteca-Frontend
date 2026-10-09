@@ -30,6 +30,7 @@ export default function HarvestDashboard() {
   const [executing, setExecuting] = useState(false);
   const [executionFeedback, setExecutionFeedback] = useState(null);
   const requestPending = useRef(false);
+  const active = executing || Boolean(data?.harvests.results.some((row) => ["pending", "running", "pausing"].includes(row.state)));
 
   useEffect(() => {
     const controller = new AbortController();
@@ -53,9 +54,9 @@ export default function HarvestDashboard() {
       }
     }
     load();
-    const timer = setInterval(() => { if (!document.hidden) load(); }, 30000);
+    const timer = setInterval(() => { if (!document.hidden) load(); }, active ? 5000 : 30000);
     return () => { controller.abort(); clearInterval(timer); };
-  }, [page, schedulePage, revision]);
+  }, [page, schedulePage, revision, active]);
 
   function refresh() {
     setLoading(true);
@@ -106,7 +107,7 @@ export default function HarvestDashboard() {
           <MetricCard value={showData ? totals.updated : "—"} label="Actualizados" />
           <MetricCard value={showData ? totals.failed : "—"} label="Registros fallidos" />
         </div>
-        <p className="text-xs text-[#68707C]">Los indicadores de registros corresponden a las ejecuciones de esta página. Fechas en America/Bogota. Actualización automática cada 30 segundos.</p>
+        <p className="text-xs text-[#68707C]">Los indicadores de registros corresponden a las ejecuciones de esta página. Fechas en America/Bogota. Actualización automática cada 30 segundos; cada 5 segundos durante ejecuciones activas.</p>
         {loading && <Notice live>Cargando cosechas y programaciones…</Notice>}
         {error && <Notice variant="error" live>{error}</Notice>}
         <section className="flex min-h-[330px] flex-col gap-3.5 rounded-xl border border-[#DCE0E5] bg-white p-5" aria-labelledby="runs-title" aria-busy={loading}>

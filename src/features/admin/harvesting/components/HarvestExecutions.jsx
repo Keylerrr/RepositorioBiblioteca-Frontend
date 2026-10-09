@@ -18,14 +18,15 @@ const STATES = {
 };
 
 export default function HarvestExecutions({ rows, onRefresh, busy = false, caption = "Ejecuciones recientes de cosecha" }) {
-  const [action, setAction] = useState(null);
+  const [actions, setActions] = useState({});
   const [feedback, setFeedback] = useState(null);
-  const requestPending = useRef(false);
+  const requestPending = useRef(new Set());
 
   async function control(row, resume) {
-    if (busy || requestPending.current) return;
-    requestPending.current = true;
-    setAction({ id: row.id, resume });
+    const key = `${row.id}:${resume ? "resume" : "pause"}`;
+    if (busy || requestPending.current.has(key)) return;
+    requestPending.current.add(key);
+    setActions((current) => ({ ...current, [key]: true }));
     setFeedback(null);
     try {
       const harvest = await (resume ? resumeHarvest(row.id) : pauseHarvest(row.id));
@@ -40,8 +41,12 @@ export default function HarvestExecutions({ rows, onRefresh, busy = false, capti
     } finally {
       // Also refresh on errors: a timeout or incompatible state can follow a server-side change.
       onRefresh();
-      requestPending.current = false;
-      setAction(null);
+      requestPending.current.delete(key);
+      setActions((current) => {
+        const next = { ...current };
+        delete next[key];
+        return next;
+      });
     }
   }
 
@@ -62,9 +67,9 @@ export default function HarvestExecutions({ rows, onRefresh, busy = false, capti
       if (row.state === "pausing") return <span className="text-xs text-[#68707C]">Esperando pausa…</span>;
       const resume = row.state === "paused";
       if (!resume && row.state !== "pending" && row.state !== "running") return <span className="text-[#68707C]">—</span>;
-      const pending = action?.id === row.id;
-      return <Button variant="quiet" size="small" disabled={busy || Boolean(action)} aria-label={`${resume ? "Reanudar" : "Pausar"} cosecha de ${row.platform_name} (#${row.id})`} onClick={() => control(row, resume)}>
-        {pending ? action.resume ? "Reanudando…" : "Solicitando…" : resume ? "Reanudar" : "Pausar"}
+      const pending = actions[`${row.id}:${resume ? "resume" : "pause"}`];
+      return <Button variant="quiet" size="small" disabled={busy || Boolean(pending)} aria-label={`${resume ? "Reanudar" : "Pausar"} cosecha de ${row.platform_name} (#${row.id})`} onClick={() => control(row, resume)}>
+        {pending ? resume ? "Reanudando…" : "Solicitando…" : resume ? "Reanudar" : "Pausar"}
       </Button>;
     } },
   ];

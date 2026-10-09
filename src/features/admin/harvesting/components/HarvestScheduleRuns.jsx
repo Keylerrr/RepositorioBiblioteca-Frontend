@@ -32,7 +32,7 @@ export default function HarvestScheduleRuns({ scheduleId, revision, busy }) {
       }
     }
     load();
-    const timer = setInterval(() => { if (!document.hidden) load(); }, 30000);
+    const timer = setInterval(() => { if (!document.hidden) load(); }, 5000);
     return () => { controller.abort(); clearInterval(timer); };
   }, [scheduleId, revision, refreshCount]);
 
@@ -47,7 +47,7 @@ export default function HarvestScheduleRuns({ scheduleId, revision, busy }) {
         <h2 id="created-runs-title" className="text-[21px] leading-7 font-semibold min-[541px]:text-2xl min-[541px]:leading-8">Ejecuciones de la programación #{scheduleId}</h2>
         <Button variant="quiet" size="small" disabled={loading} onClick={refresh}>Actualizar ejecuciones</Button>
       </div>
-      <p className="text-xs text-[#68707C]">Estado actualizado cada 30 segundos. Aquí se muestran únicamente las ejecuciones de esta programación.</p>
+      <p className="text-xs text-[#68707C]">Estado actualizado cada 5 segundos. Aquí se muestran únicamente las ejecuciones de esta programación.</p>
       {loading && <Notice live>Cargando ejecuciones…</Notice>}
       {error && <Notice variant="error" live>{error}</Notice>}
       {rows && <HarvestExecutions rows={rows} onRefresh={refresh} busy={loading || Boolean(error)} caption={`Ejecuciones de la programación ${scheduleId}`} />}
