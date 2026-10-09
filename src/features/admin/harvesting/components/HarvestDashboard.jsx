@@ -1,56 +1,32 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import AdminTable from "@/shared/components/AdminTable";
-import Badge from "@/shared/components/Badge";
 import Button from "@/shared/components/Button";
+import FormField from "@/shared/components/FormField";
 import MetricCard from "@/shared/components/MetricCard";
 import Notice from "@/shared/components/Notice";
-import { formatDate, getHarvests, getHarvestSources, getPlatforms, getSchedules } from "@/features/admin/harvesting/harvesting";
+import { deactivateSchedule, formatDate, getHarvests, getHarvestSourceCount, getUpcomingSchedules, runDueSchedules } from "@/features/admin/harvesting/harvesting";
+import HarvestExecutions from "./HarvestExecutions";
 
-const STATES = {
-  pending: { label: "Pendiente", badge: "info" },
-  running: { label: "En ejecución", badge: "info" },
-  pausing: { label: "Pausando", badge: "warning" },
-  paused: { label: "Pausada", badge: "warning" },
-  completed: { label: "Completada", badge: "success" },
-  failed: { label: "Fallida", badge: "error" },
-  cancelled: { label: "Cancelada", badge: "warning" },
-};
 const FREQUENCIES = { once: "Única", daily: "Diaria", weekly: "Semanal", monthly: "Mensual" };
-
-const columns = [
-  { key: "platform_name", label: "FUENTE", width: "20%" },
-  { key: "state", label: "ESTADO", width: "19%", render: (row) => {
-    const state = STATES[row.state] || { label: row.state, badge: "info" };
-    return <Badge state={row.state === "completed" && row.records_failed > 0 ? "warning" : state.badge}>{state.label}</Badge>;
-  } },
-  { key: "started_at", label: "ÚLTIMA EJECUCIÓN", width: "23%", muted: true, render: (row) => formatDate(row.started_at) },
-  { key: "result", label: "RESULTADO", width: "38%", render: (row) => (
-    <div>
-      <span>{row.records_added} nuevas · {row.records_updated} actualizadas · {row.records_failed} fallidas</span>
-      {row.error_message && <p className="mt-1 break-words text-xs text-[#820A1F]">{row.error_message}</p>}
-    </div>
-  ) },
-];
+const SCHEDULE_PAGE_SIZE = 10;
 
 const scheduleColumns = [
-  { key: "platforms", label: "FUENTES", width: "30%", render: (row) => row.platform_names?.join(", ") || row.platforms.map((id) => `Plataforma ${id}`).join(", ") },
+  { key: "platforms", label: "FUENTES", width: "25%", render: (row) => row.platform_names?.join(", ") || row.platforms.map((id) => `Plataforma ${id}`).join(", ") },
   { key: "frequency", label: "FRECUENCIA", width: "15%", render: (row) => FREQUENCIES[row.frequency] || row.frequency },
-  { key: "start_date", label: "FECHA INICIAL", width: "25%", muted: true, render: (row) => formatDate(row.start_date) },
-  { key: "limits", label: "LÍMITES POR FUENTE", width: "30%", render: (row) => [
+  { key: "start_date", label: "FECHA INICIAL", width: "20%", muted: true, render: (row) => formatDate(row.start_date) },
+  { key: "limits", label: "LÍMITES POR FUENTE", width: "25%", render: (row) => [
     row.max_quantity == null ? null : `${row.max_quantity} revistas`,
     row.stop_after_minutes == null ? null : `${row.stop_after_minutes} minutos`,
   ].filter(Boolean).join(" · ") },
 ];
 
-export default function HarvestDashboard() {
-  const [data, setData] = useState(null);
-  const [page, setPage] = useState(1);
-  const [schedulePage, setSchedulePage] = useState(1);
+function useHarvestData(loadData, intervalMs = null) {
+  const [state, setState] = useState({ data: null, loading: true, error: "" });
   const [revision, setRevision] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const loadRef = useRef(null);
+  const pollingInterval = typeof intervalMs === "function" ? intervalMs(state.data) : intervalMs;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -59,41 +35,128 @@ export default function HarvestDashboard() {
       if (fetching) return;
       fetching = true;
       try {
-        const [harvests, schedules, platforms] = await Promise.all([
-          getHarvests(page, controller.signal), getSchedules(schedulePage, controller.signal), getPlatforms(controller.signal),
-        ]);
+        const data = await loadData(controller.signal);
         if (!controller.signal.aborted) {
-          setData({ harvests, schedules, platforms });
-          setError("");
+          setState({ data, loading: false, error: "" });
         }
       } catch (error) {
-        if (!controller.signal.aborted) setError(error.message);
+        if (!controller.signal.aborted) setState((current) => ({ ...current, loading: false, error: error.message }));
       } finally {
         fetching = false;
-        if (!controller.signal.aborted) setLoading(false);
       }
     }
+    loadRef.current = load;
     load();
-    const timer = setInterval(() => { if (!document.hidden) load(); }, 30000);
-    return () => { controller.abort(); clearInterval(timer); };
-  }, [page, schedulePage, revision]);
+    return () => { controller.abort(); loadRef.current = null; };
+  }, [loadData, revision]);
 
-  function refresh() {
-    setLoading(true);
+  // Changing the polling cadence must not restart the request or fetch immediately.
+  useEffect(() => {
+    if (pollingInterval === null) return;
+    const timer = setInterval(() => { if (!document.hidden) loadRef.current?.(); }, pollingInterval);
+    return () => clearInterval(timer);
+  }, [pollingInterval]);
+
+  const refresh = useCallback(() => {
+    setState((current) => ({ ...current, loading: true }));
     setRevision((current) => current + 1);
+  }, []);
+
+  return { ...state, refresh };
+}
+
+export default function HarvestDashboard() {
+  const [page, setPage] = useState(1);
+  const [schedulePage, setSchedulePage] = useState(1);
+  const [executing, setExecuting] = useState(false);
+  const [executionFeedback, setExecutionFeedback] = useState(null);
+  const [selectedSchedule, setSelectedSchedule] = useState(null);
+  const [explanation, setExplanation] = useState("");
+  const [deactivating, setDeactivating] = useState(false);
+  const [scheduleFeedback, setScheduleFeedback] = useState(null);
+  const requestPending = useRef(false);
+
+  const loadHarvests = useCallback((signal) => getHarvests(page, signal), [page]);
+  const harvests = useHarvestData(loadHarvests, (data) => (
+    executing || data?.results.some((row) => ["pending", "running", "pausing"].includes(row.state)) ? 5000 : 30000
+  ));
+
+  const loadSchedules = useCallback(async (signal) => {
+    const schedules = await getUpcomingSchedules(signal);
+    if (!signal.aborted) {
+      setSchedulePage((current) => Math.min(current, Math.max(1, Math.ceil(schedules.length / SCHEDULE_PAGE_SIZE))));
+    }
+    return schedules;
+  }, []);
+  const upcomingSchedules = useHarvestData(loadSchedules, 30000);
+  const sources = useHarvestData(getHarvestSourceCount);
+
+  async function executeDue() {
+    if (requestPending.current || harvests.loading || upcomingSchedules.loading) return;
+    requestPending.current = true;
+    setExecuting(true);
+    setExecutionFeedback(null);
+    try {
+      await runDueSchedules();
+      setExecutionFeedback({ variant: "neutral", message: "Solicitud de ejecución procesada. Consulta el estado actualizado en las ejecuciones." });
+    } catch (error) {
+      setExecutionFeedback({ variant: "error", message: error.message });
+    } finally {
+      requestPending.current = false;
+      setExecuting(false);
+      // The result may be uncertain after a timeout; always read the current state.
+      setPage(1);
+      harvests.refresh();
+      upcomingSchedules.refresh();
+    }
   }
+
+  async function deactivate(event) {
+    event.preventDefault();
+    if (requestPending.current || upcomingSchedules.loading || !selectedSchedule || !explanation.trim()) return;
+    requestPending.current = true;
+    setDeactivating(true);
+    setScheduleFeedback(null);
+    try {
+      await deactivateSchedule(selectedSchedule.id, explanation);
+      setScheduleFeedback({ variant: "success", message: `Programación #${selectedSchedule.id} desactivada.` });
+      setSelectedSchedule(null);
+      setExplanation("");
+    } catch (error) {
+      setScheduleFeedback({ variant: "error", message: error.message });
+    } finally {
+      requestPending.current = false;
+      setDeactivating(false);
+      upcomingSchedules.refresh();
+    }
+  }
+
+  const columns = [...scheduleColumns, {
+    key: "actions", label: "ACCIONES", width: "15%", render: (row) => (
+      <Button variant="quiet" size="small" disabled={upcomingSchedules.loading || Boolean(upcomingSchedules.error) || executing || deactivating} aria-label={`Desactivar programación #${row.id}`} onClick={() => {
+        setSelectedSchedule(row);
+        setExplanation("");
+        setScheduleFeedback(null);
+      }}>Desactivar</Button>
+    ),
+  }];
 
   function changePage(nextPage, schedules = false) {
-    setLoading(true);
     if (schedules) setSchedulePage(nextPage);
-    else setPage(nextPage);
+    else {
+      setPage(nextPage);
+      harvests.refresh();
+    }
   }
 
-  const runs = data?.harvests.results || [];
+  const runs = harvests.data?.results || [];
+  const scheduleCount = upcomingSchedules.data?.length || 0;
+  const schedulePages = Math.max(1, Math.ceil(scheduleCount / SCHEDULE_PAGE_SIZE));
+  const schedules = upcomingSchedules.data?.slice((schedulePage - 1) * SCHEDULE_PAGE_SIZE, schedulePage * SCHEDULE_PAGE_SIZE) || [];
   const totals = runs.reduce((sum, row) => ({
     added: sum.added + row.records_added, updated: sum.updated + row.records_updated, failed: sum.failed + row.records_failed,
   }), { added: 0, updated: 0, failed: 0 });
-  const showData = data && !loading && !error;
+  const showHarvests = Boolean(harvests.data);
 
   return (
     <div className="flex-1 bg-[#F7F8FA] font-sans text-sm leading-[22px] text-[#171A1F]">
@@ -104,34 +167,56 @@ export default function HarvestDashboard() {
         </div>
         <p className="text-sm leading-[22px] text-[#68707C] min-[541px]:text-base min-[541px]:leading-[26px]">Supervisa conectores, ejecuciones y registros modificados.</p>
         <div className="grid grid-cols-2 gap-3 min-[541px]:gap-4 min-[901px]:grid-cols-4">
-          <MetricCard value={showData ? getHarvestSources(data.platforms).length : "—"} label="Fuentes habilitadas para cosecha" />
-          <MetricCard value={showData ? totals.added + totals.updated + totals.failed : "—"} label="Registros contabilizados" />
-          <MetricCard value={showData ? totals.updated : "—"} label="Actualizados" />
-          <MetricCard value={showData ? totals.failed : "—"} label="Registros fallidos" />
+          <MetricCard value={sources.data ?? "—"} label="Fuentes habilitadas para cosecha" />
+          <MetricCard value={showHarvests ? totals.added + totals.updated + totals.failed : "—"} label="Registros contabilizados" />
+          <MetricCard value={showHarvests ? totals.updated : "—"} label="Actualizados" />
+          <MetricCard value={showHarvests ? totals.failed : "—"} label="Registros fallidos" />
         </div>
-        <p className="text-xs text-[#68707C]">Los indicadores de registros corresponden a las ejecuciones de esta página. Fechas en America/Bogota. Actualización automática cada 30 segundos.</p>
-        {loading && <Notice live>Cargando cosechas y programaciones…</Notice>}
-        {error && <Notice variant="error" live>{error}</Notice>}
-        <section className="flex min-h-[330px] flex-col gap-3.5 rounded-xl border border-[#DCE0E5] bg-white p-5" aria-labelledby="runs-title" aria-busy={loading}>
+        <p className="text-xs text-[#68707C]">Los indicadores de registros corresponden a las ejecuciones de esta página. Fechas en America/Bogota. Ejecuciones actualizadas cada 30 segundos; cada 5 segundos durante ejecuciones activas. Programaciones actualizadas cada 30 segundos.</p>
+        {sources.error && <Notice variant="error" live>
+          Fuentes habilitadas para cosecha: {sources.error}
+          <Button variant="quiet" size="small" disabled={sources.loading} onClick={sources.refresh}>Reintentar fuentes</Button>
+        </Notice>}
+        <section className="flex min-h-[330px] flex-col gap-3.5 rounded-xl border border-[#DCE0E5] bg-white p-5" aria-labelledby="runs-title" aria-busy={harvests.loading}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 id="runs-title" className="text-[21px] leading-7 font-semibold min-[541px]:text-2xl min-[541px]:leading-8">Ejecuciones recientes</h2>
-            <Button variant="quiet" size="small" disabled={loading} onClick={refresh}>Actualizar</Button>
+            <Button variant="quiet" size="small" disabled={harvests.loading} onClick={harvests.refresh}>Actualizar</Button>
           </div>
-          {showData && (runs.length ? <AdminTable caption="Ejecuciones recientes de cosecha" columns={columns} rows={runs} /> : <Notice>Todavía no hay ejecuciones de cosecha.</Notice>)}
-          {showData && data.harvests.total_pages > 1 && <div className="flex flex-wrap items-center gap-3">
-            <Button variant="quiet" size="small" disabled={page <= 1} onClick={() => changePage(page - 1)}>Anterior</Button>
-            <span>Página {page} de {data.harvests.total_pages} · {data.harvests.total_items} ejecuciones</span>
-            <Button variant="quiet" size="small" disabled={page >= data.harvests.total_pages} onClick={() => changePage(page + 1)}>Siguiente</Button>
+          {harvests.loading && <Notice live>Cargando ejecuciones…</Notice>}
+          {harvests.error && <Notice variant="error" live>{harvests.error}</Notice>}
+          {showHarvests && <HarvestExecutions rows={runs} onRefresh={harvests.refresh} busy={harvests.loading || Boolean(harvests.error)} />}
+          {showHarvests && harvests.data.total_pages > 1 && <div className="flex flex-wrap items-center gap-3">
+            <Button variant="quiet" size="small" disabled={harvests.loading || page <= 1} onClick={() => changePage(page - 1)}>Anterior</Button>
+            <span>Página {page} de {harvests.data.total_pages} · {harvests.data.total_items} ejecuciones</span>
+            <Button variant="quiet" size="small" disabled={harvests.loading || page >= harvests.data.total_pages} onClick={() => changePage(page + 1)}>Siguiente</Button>
           </div>}
           <Button href="/admin/cosecha/nueva" className="mt-auto w-[220px] self-start">Nueva cosecha</Button>
         </section>
-        <section className="flex flex-col gap-3.5 rounded-xl border border-[#DCE0E5] bg-white p-5" aria-labelledby="schedules-title" aria-busy={loading}>
-          <h2 id="schedules-title" className="text-[21px] leading-7 font-semibold min-[541px]:text-2xl min-[541px]:leading-8">Programaciones</h2>
-          {showData && (data.schedules.results.length ? <AdminTable caption="Programaciones de cosecha" columns={scheduleColumns} rows={data.schedules.results} /> : <Notice>Todavía no hay programaciones de cosecha.</Notice>)}
-          {showData && data.schedules.total_pages > 1 && <div className="flex flex-wrap items-center gap-3">
-            <Button variant="quiet" size="small" disabled={schedulePage <= 1} onClick={() => changePage(schedulePage - 1, true)}>Anterior</Button>
-            <span>Página {schedulePage} de {data.schedules.total_pages} · {data.schedules.total_items} programaciones</span>
-            <Button variant="quiet" size="small" disabled={schedulePage >= data.schedules.total_pages} onClick={() => changePage(schedulePage + 1, true)}>Siguiente</Button>
+        <section className="flex flex-col gap-3.5 rounded-xl border border-[#DCE0E5] bg-white p-5" aria-labelledby="schedules-title" aria-busy={upcomingSchedules.loading}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 id="schedules-title" className="text-[21px] leading-7 font-semibold min-[541px]:text-2xl min-[541px]:leading-8">Programaciones</h2>
+            <Button size="small" disabled={harvests.loading || upcomingSchedules.loading || executing || deactivating} onClick={executeDue}>{executing ? "Ejecutando…" : "Ejecutar cosechas manualmente"}</Button>
+          </div>
+          <p className="text-xs text-[#68707C]">Se muestran las programaciones únicas que todavía no se han lanzado y las recurrentes para sus próximas ejecuciones.</p>
+          <p className="text-xs text-[#68707C]">Inicia ahora todas las programaciones activas cuya fecha ya venció, incluidas las de otras páginas. Las programaciones futuras conservan su fecha.</p>
+          {executionFeedback && <Notice variant={executionFeedback.variant} live>{executionFeedback.message}</Notice>}
+          {upcomingSchedules.loading && <Notice live>Cargando programaciones…</Notice>}
+          {upcomingSchedules.error && <Notice variant="error" live>{upcomingSchedules.error}</Notice>}
+          {scheduleFeedback && <Notice variant={scheduleFeedback.variant} live>{scheduleFeedback.message}</Notice>}
+          {upcomingSchedules.data && (schedules.length ? <AdminTable caption="Programaciones de cosecha pendientes y recurrentes" columns={columns} rows={schedules} /> : <Notice>No hay programaciones pendientes de cosecha.</Notice>)}
+          {selectedSchedule && <form onSubmit={deactivate} className="flex flex-col gap-3 rounded-lg border border-[#DCE0E5] p-4" aria-busy={deactivating}>
+            <p className="font-semibold">Desactivar programación #{selectedSchedule.id}</p>
+            <p className="text-xs text-[#68707C]">{selectedSchedule.platform_names?.join(", ")}. Esta programación dejará de generar nuevas ejecuciones. El motivo permite archivarla si tiene registros asociados.</p>
+            <FormField id="schedule-deactivation-reason" label="Motivo de desactivación" required autoFocus disabled={deactivating} value={explanation} onChange={(event) => setExplanation(event.target.value)} />
+            <div className="flex flex-wrap gap-3">
+              <Button type="submit" size="small" disabled={deactivating || executing || upcomingSchedules.loading || !explanation.trim()}>{deactivating ? "Desactivando…" : "Confirmar desactivación"}</Button>
+              <Button variant="quiet" size="small" disabled={deactivating} onClick={() => { setSelectedSchedule(null); setExplanation(""); }}>Cancelar</Button>
+            </div>
+          </form>}
+          {upcomingSchedules.data && schedulePages > 1 && <div className="flex flex-wrap items-center gap-3">
+            <Button variant="quiet" size="small" disabled={upcomingSchedules.loading || schedulePage <= 1} onClick={() => changePage(schedulePage - 1, true)}>Anterior</Button>
+            <span>Página {schedulePage} de {schedulePages} · {scheduleCount} programaciones</span>
+            <Button variant="quiet" size="small" disabled={upcomingSchedules.loading || schedulePage >= schedulePages} onClick={() => changePage(schedulePage + 1, true)}>Siguiente</Button>
           </div>}
         </section>
       </div>
