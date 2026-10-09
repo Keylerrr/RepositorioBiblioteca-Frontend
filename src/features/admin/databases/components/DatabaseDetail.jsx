@@ -489,12 +489,12 @@ export default function DatabaseDetail({ platformId }) {
                       </div>
                       <span
                         className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                          log.is_valid || log.status_code === 200
+                          log.is_active || log.http_status_code === 200
                             ? "bg-emerald-100 text-emerald-800"
                             : "bg-rose-100 text-rose-800"
                         }`}
                       >
-                        {log.is_valid || log.status_code === 200 ? "Válido" : "Error"}
+                        {log.is_active || log.http_status_code === 200 ? "Válido" : "Error"}
                       </span>
                     </div>
                   ))}
