@@ -8,6 +8,7 @@ const FIELD_NAMES = {
   start_date: "Fecha inicial",
   max_quantity: "Límite de revistas",
   stop_after_minutes: "Límite de tiempo",
+  delete_explanation: "Motivo de desactivación",
   url: "URL",
   non_field_errors: "Validación",
 };
@@ -136,6 +137,14 @@ export function checkPlatformLink(platformId, url) {
 
 export function createSchedule(payload) {
   return request("/api/harvesting/schedules/", { method: "POST", body: payload });
+}
+
+export function deactivateSchedule(id, explanation) {
+  return request(`/api/harvesting/schedules/${id}/`, {
+    method: "DELETE",
+    body: { delete_explanation: explanation.trim() },
+    expectJson: false,
+  });
 }
 
 export function buildImmediateScheduleUpdate(schedule) {
