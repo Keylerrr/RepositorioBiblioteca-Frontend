@@ -86,12 +86,6 @@ export default function HarvestDashboard() {
   const upcomingSchedules = useHarvestData(loadSchedules, 30000);
   const sources = useHarvestData(getHarvestSourceCount);
 
-  function refresh() {
-    harvests.refresh();
-    upcomingSchedules.refresh();
-    sources.refresh();
-  }
-
   async function executeDue() {
     if (requestPending.current || harvests.loading || upcomingSchedules.loading) return;
     requestPending.current = true;
@@ -144,11 +138,14 @@ export default function HarvestDashboard() {
           <MetricCard value={showHarvests ? totals.failed : "—"} label="Registros fallidos" />
         </div>
         <p className="text-xs text-[#68707C]">Los indicadores de registros corresponden a las ejecuciones de esta página. Fechas en America/Bogota. Ejecuciones actualizadas cada 30 segundos; cada 5 segundos durante ejecuciones activas. Programaciones actualizadas cada 30 segundos.</p>
-        {sources.error && <Notice variant="error" live>Fuentes habilitadas para cosecha: {sources.error}</Notice>}
+        {sources.error && <Notice variant="error" live>
+          Fuentes habilitadas para cosecha: {sources.error}
+          <Button variant="quiet" size="small" disabled={sources.loading} onClick={sources.refresh}>Reintentar fuentes</Button>
+        </Notice>}
         <section className="flex min-h-[330px] flex-col gap-3.5 rounded-xl border border-[#DCE0E5] bg-white p-5" aria-labelledby="runs-title" aria-busy={harvests.loading}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 id="runs-title" className="text-[21px] leading-7 font-semibold min-[541px]:text-2xl min-[541px]:leading-8">Ejecuciones recientes</h2>
-            <Button variant="quiet" size="small" disabled={harvests.loading || upcomingSchedules.loading || sources.loading} onClick={refresh}>Actualizar</Button>
+            <Button variant="quiet" size="small" disabled={harvests.loading} onClick={harvests.refresh}>Actualizar</Button>
           </div>
           {harvests.loading && <Notice live>Cargando ejecuciones…</Notice>}
           {harvests.error && <Notice variant="error" live>{harvests.error}</Notice>}
