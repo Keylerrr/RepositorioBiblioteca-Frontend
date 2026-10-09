@@ -5,10 +5,11 @@ import AdminTable from "@/shared/components/AdminTable";
 import Button from "@/shared/components/Button";
 import MetricCard from "@/shared/components/MetricCard";
 import Notice from "@/shared/components/Notice";
-import { formatDate, getHarvests, getHarvestSources, getPlatforms, getSchedules, runDueSchedules } from "@/features/admin/harvesting/harvesting";
+import { formatDate, getHarvests, getHarvestSources, getPlatforms, getUpcomingSchedules, runDueSchedules } from "@/features/admin/harvesting/harvesting";
 import HarvestExecutions from "./HarvestExecutions";
 
 const FREQUENCIES = { once: "Única", daily: "Diaria", weekly: "Semanal", monthly: "Mensual" };
+const SCHEDULE_PAGE_SIZE = 10;
 
 const scheduleColumns = [
   { key: "platforms", label: "FUENTES", width: "30%", render: (row) => row.platform_names?.join(", ") || row.platforms.map((id) => `Plataforma ${id}`).join(", ") },
@@ -40,10 +41,11 @@ export default function HarvestDashboard() {
       fetching = true;
       try {
         const [harvests, schedules, platforms] = await Promise.all([
-          getHarvests(page, controller.signal), getSchedules(schedulePage, controller.signal), getPlatforms(controller.signal),
+          getHarvests(page, controller.signal), getUpcomingSchedules(controller.signal), getPlatforms(controller.signal),
         ]);
         if (!controller.signal.aborted) {
           setData({ harvests, schedules, platforms });
+          setSchedulePage((current) => Math.min(current, Math.max(1, Math.ceil(schedules.length / SCHEDULE_PAGE_SIZE))));
           setError("");
         }
       } catch (error) {
@@ -56,7 +58,7 @@ export default function HarvestDashboard() {
     load();
     const timer = setInterval(() => { if (!document.hidden) load(); }, active ? 5000 : 30000);
     return () => { controller.abort(); clearInterval(timer); };
-  }, [page, schedulePage, revision, active]);
+  }, [page, revision, active]);
 
   function refresh() {
     setLoading(true);
@@ -83,12 +85,17 @@ export default function HarvestDashboard() {
   }
 
   function changePage(nextPage, schedules = false) {
-    setLoading(true);
     if (schedules) setSchedulePage(nextPage);
-    else setPage(nextPage);
+    else {
+      setLoading(true);
+      setPage(nextPage);
+    }
   }
 
   const runs = data?.harvests.results || [];
+  const scheduleCount = data?.schedules.length || 0;
+  const schedulePages = Math.max(1, Math.ceil(scheduleCount / SCHEDULE_PAGE_SIZE));
+  const schedules = data?.schedules.slice((schedulePage - 1) * SCHEDULE_PAGE_SIZE, schedulePage * SCHEDULE_PAGE_SIZE) || [];
   const totals = runs.reduce((sum, row) => ({
     added: sum.added + row.records_added, updated: sum.updated + row.records_updated, failed: sum.failed + row.records_failed,
   }), { added: 0, updated: 0, failed: 0 });
@@ -129,13 +136,14 @@ export default function HarvestDashboard() {
             <h2 id="schedules-title" className="text-[21px] leading-7 font-semibold min-[541px]:text-2xl min-[541px]:leading-8">Programaciones</h2>
             <Button size="small" disabled={loading || executing} onClick={executeDue}>{executing ? "Ejecutando…" : "Ejecutar cosechas manualmente"}</Button>
           </div>
+          <p className="text-xs text-[#68707C]">Se muestran las programaciones únicas que todavía no se han lanzado y las recurrentes para sus próximas ejecuciones.</p>
           <p className="text-xs text-[#68707C]">Inicia ahora todas las programaciones activas cuya fecha ya venció, incluidas las de otras páginas. Las programaciones futuras conservan su fecha.</p>
           {executionFeedback && <Notice variant={executionFeedback.variant} live>{executionFeedback.message}</Notice>}
-          {showData && (data.schedules.results.length ? <AdminTable caption="Programaciones de cosecha" columns={scheduleColumns} rows={data.schedules.results} /> : <Notice>Todavía no hay programaciones de cosecha.</Notice>)}
-          {showData && data.schedules.total_pages > 1 && <div className="flex flex-wrap items-center gap-3">
+          {showData && (schedules.length ? <AdminTable caption="Programaciones de cosecha pendientes y recurrentes" columns={scheduleColumns} rows={schedules} /> : <Notice>No hay programaciones pendientes de cosecha.</Notice>)}
+          {showData && schedulePages > 1 && <div className="flex flex-wrap items-center gap-3">
             <Button variant="quiet" size="small" disabled={loading || schedulePage <= 1} onClick={() => changePage(schedulePage - 1, true)}>Anterior</Button>
-            <span>Página {schedulePage} de {data.schedules.total_pages} · {data.schedules.total_items} programaciones</span>
-            <Button variant="quiet" size="small" disabled={loading || schedulePage >= data.schedules.total_pages} onClick={() => changePage(schedulePage + 1, true)}>Siguiente</Button>
+            <span>Página {schedulePage} de {schedulePages} · {scheduleCount} programaciones</span>
+            <Button variant="quiet" size="small" disabled={loading || schedulePage >= schedulePages} onClick={() => changePage(schedulePage + 1, true)}>Siguiente</Button>
           </div>}
         </section>
       </div>
