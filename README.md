@@ -25,7 +25,7 @@ pnpm build
 pnpm start
 ```
 
-La ejecución inmediata crea una programación única, ajusta su `start_date` al `created_at` devuelto por el backend mediante `PATCH /api/harvesting/schedules/{id}/` y llama a `POST /api/harvesting/schedules/run-due/`, que procesa todas las programaciones activas vencidas. Usar la hora del backend evita que un reloj adelantado en el navegador deje la cosecha pendiente. La pausa y reanudación operan sobre cada ejecución mediante `/api/harvesting/harvests/{id}/pause/` y `/resume/`. Estas vistas no incluyen respuestas simuladas ni un backend de prueba.
+La opción inmediata crea una programación única y ajusta su `start_date` al `created_at` devuelto por el backend mediante `PATCH /api/harvesting/schedules/{id}/`. En Nueva cosecha, `POST /api/harvesting/schedules/run-due/` se llama únicamente al pulsar **Actualizar ejecuciones**; guardar, reintentar la preparación y consultar periódicamente el estado no lo invocan. El panel conserva el botón **Ejecutar cosechas manualmente**. Ambos botones procesan todas las programaciones activas vencidas. Usar la hora del backend evita que un reloj adelantado en el navegador deje la cosecha pendiente. La pausa y reanudación operan sobre cada ejecución mediante `/api/harvesting/harvests/{id}/pause/` y `/resume/`. Estas vistas no incluyen respuestas simuladas ni un backend de prueba.
 
 `run-due` se invoca sin cuerpo y acepta una respuesta exitosa sin contenido. El frontend consulta `GET /api/harvesting/harvests/` para obtener los estados, contadores y errores de las ejecuciones.
 

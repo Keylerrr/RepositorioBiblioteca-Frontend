@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Button from "@/shared/components/Button";
 import FormField from "@/shared/components/FormField";
 import Notice from "@/shared/components/Notice";
-import { buildSchedule, createSchedule, formatDate, getHarvestSources, getPlatforms, nextBogotaDate, prepareImmediateSchedule, runDueSchedules } from "@/features/admin/harvesting/harvesting";
+import { buildSchedule, createSchedule, formatDate, getHarvestSources, getPlatforms, nextBogotaDate, prepareImmediateSchedule } from "@/features/admin/harvesting/harvesting";
 import HarvestSourceOption from "./HarvestSourceOption";
 import HarvestScheduleRuns from "./HarvestScheduleRuns";
 
@@ -32,7 +32,7 @@ export default function HarvestForm() {
   const [saving, setSaving] = useState(false);
   const [created, setCreated] = useState(null);
   const [executionFeedback, setExecutionFeedback] = useState(null);
-  const [canRetryStart, setCanRetryStart] = useState(false);
+  const [canRetryPreparation, setCanRetryPreparation] = useState(false);
   const [runsRevision, setRunsRevision] = useState(0);
   const requestPending = useRef(false);
 
@@ -58,27 +58,26 @@ export default function HarvestForm() {
     return () => controller.abort();
   }, [revision]);
 
-  async function launch(schedule) {
+  async function prepare(schedule) {
     setExecutionFeedback(null);
-    setCanRetryStart(false);
+    setCanRetryPreparation(false);
     try {
       setCreated(await prepareImmediateSchedule(schedule));
-      await runDueSchedules();
-      setExecutionFeedback({ variant: "neutral", message: "Solicitud de ejecución procesada. Consulta abajo el estado actualizado de tu cosecha." });
+      setExecutionFeedback({ variant: "neutral", message: "Programación lista. Pulsa Actualizar ejecuciones para ejecutar las programaciones vencidas y consultar su estado." });
     } catch (error) {
-      setExecutionFeedback({ variant: "error", message: `La programación quedó guardada, pero no se pudo confirmar el inicio. ${error.message} Revisa las ejecuciones antes de reintentar.` });
-      setCanRetryStart(true);
+      setExecutionFeedback({ variant: "error", message: `La programación quedó guardada, pero no se pudo ajustar su fecha de inicio. ${error.message}` });
+      setCanRetryPreparation(true);
     } finally {
       setRunsRevision((current) => current + 1);
     }
   }
 
-  async function retryStart() {
+  async function retryPreparation() {
     if (requestPending.current || !created) return;
     requestPending.current = true;
     setSaving(true);
     try {
-      await launch(created);
+      await prepare(created);
     } finally {
       requestPending.current = false;
       setSaving(false);
@@ -95,7 +94,7 @@ export default function HarvestForm() {
       setSaving(true);
       const schedule = await createSchedule(payload);
       setCreated(schedule);
-      if (mode === "now") await launch(schedule);
+      if (mode === "now") await prepare(schedule);
     } catch (error) {
       setError(error.message);
     } finally {
@@ -137,7 +136,7 @@ export default function HarvestForm() {
                 <label className={`flex cursor-pointer items-center gap-[5px] ${mode === "now" ? "text-[#A90D27]" : "text-[#68707C]"}`}><input className={radioClasses} type="radio" name="mode" value="now" checked={mode === "now"} onChange={() => setMode("now")} />Ejecutar una vez ahora</label>
                 <label className={`flex cursor-pointer items-center gap-[5px] ${mode === "scheduled" ? "text-[#A90D27]" : "text-[#68707C]"}`}><input className={radioClasses} type="radio" name="mode" value="scheduled" checked={mode === "scheduled"} onChange={() => setMode("scheduled")} />Programar cosecha</label>
               </div>
-              {mode === "now" && <Notice>Se guardará una programación única con inicio ahora y se ejecutarán todas las programaciones vencidas, incluidas otras que estén pendientes. Podrás pausar o reanudar tu cosecha cuando aparezca su ejecución.</Notice>}
+              {mode === "now" && <Notice>Se guardará una programación única con inicio ahora. Pulsa Actualizar ejecuciones para ejecutar todas las programaciones vencidas, incluidas otras que estén pendientes. Podrás pausar o reanudar tu cosecha cuando aparezca su ejecución.</Notice>}
               <div className="grid grid-cols-1 gap-4 min-[901px]:grid-cols-3">
                 <FormField id="harvest-start" label="Fecha y hora inicial" type="datetime-local" required={mode === "scheduled"} disabled={mode === "now"} value={startDate} onChange={(event) => setStartDate(event.target.value)} />
                 <FormField id="harvest-frequency" label="Frecuencia" options={frequencies} disabled={mode === "now"} value={frequency} onChange={(event) => setFrequency(event.target.value)} />
@@ -149,16 +148,16 @@ export default function HarvestForm() {
           {sourceError && <Button variant="quiet" className="self-start" onClick={() => { setLoading(true); setRevision((current) => current + 1); }}>Reintentar carga</Button>}
           <div className="flex flex-wrap items-center gap-3">
             <Button href="/admin/cosecha" variant="quiet" className="w-full min-w-[140px] min-[541px]:w-auto">{created ? "Ver cosechas" : "Cancelar"}</Button>
-            {!created && <Button type="submit" disabled={loading || saving || Boolean(sourceError) || !selectedSource} className="w-full min-w-[210px] min-[541px]:w-auto">{saving ? mode === "now" ? "Guardando e iniciando…" : "Guardando…" : mode === "scheduled" ? "Programar cosecha" : "Ejecutar cosecha"}</Button>}
-            {created && canRetryStart && <Button disabled={saving} onClick={retryStart}>{saving ? "Iniciando…" : "Reintentar inicio"}</Button>}
-            {created && <Button disabled={saving} onClick={() => { setCreated(null); setExecutionFeedback(null); setCanRetryStart(false); setStartDate(nextBogotaDate()); }} className="w-full min-[541px]:w-auto">Crear otra cosecha</Button>}
+            {!created && <Button type="submit" disabled={loading || saving || Boolean(sourceError) || !selectedSource} className="w-full min-w-[210px] min-[541px]:w-auto">{saving ? "Guardando…" : mode === "scheduled" ? "Programar cosecha" : "Guardar cosecha"}</Button>}
+            {created && canRetryPreparation && <Button disabled={saving} onClick={retryPreparation}>{saving ? "Preparando…" : "Reintentar preparación"}</Button>}
+            {created && <Button disabled={saving} onClick={() => { setCreated(null); setExecutionFeedback(null); setCanRetryPreparation(false); setStartDate(nextBogotaDate()); }} className="w-full min-[541px]:w-auto">Crear otra cosecha</Button>}
           </div>
           {error && <Notice variant="error" live>{error}</Notice>}
           {created && <Notice variant="success" live>Programación #{created.id} guardada. Inicio: {formatDate(created.start_date)} (America/Bogota). {created.frequency === "once" ? "Consulta abajo el estado de la ejecución." : "El backend ejecutará la cosecha en la fecha programada."} Guardar la programación no significa que la cosecha haya terminado.</Notice>}
-          {created && saving && <Notice live>Solicitando la ejecución de las programaciones vencidas…</Notice>}
+          {created && saving && <Notice live>Preparando la programación…</Notice>}
           {executionFeedback && <Notice variant={executionFeedback.variant} live>{executionFeedback.message}</Notice>}
         </form>
-        {created?.frequency === "once" && <HarvestScheduleRuns key={created.id} scheduleId={created.id} revision={runsRevision} busy={saving} />}
+        {created?.frequency === "once" && <HarvestScheduleRuns key={created.id} scheduleId={created.id} revision={runsRevision} busy={saving || canRetryPreparation} />}
       </div>
     </div>
   );
