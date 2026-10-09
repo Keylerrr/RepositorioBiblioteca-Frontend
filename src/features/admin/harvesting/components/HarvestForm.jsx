@@ -9,6 +9,7 @@ import HarvestSourceOption from "./HarvestSourceOption";
 import HarvestScheduleRuns from "./HarvestScheduleRuns";
 
 const frequencies = [
+  { value: "once", label: "Única vez" },
   { value: "daily", label: "Diaria" },
   { value: "weekly", label: "Semanal" },
   { value: "monthly", label: "Mensual" },
