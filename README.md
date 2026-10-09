@@ -29,6 +29,8 @@ La ejecución inmediata crea una programación única, ajusta su `start_date` al
 
 `run-due` se invoca sin cuerpo y acepta una respuesta exitosa sin contenido. El frontend consulta `GET /api/harvesting/harvests/` para obtener los estados, contadores y errores de las ejecuciones.
 
+La tabla de programaciones conserva las recurrentes y oculta las únicas que ya tienen un evento de ejecución. El filtro se aplica en el frontend, relacionando los listados completos y paginados de `/api/harvesting/schedules/` y `/api/harvesting/events/`. La tabla se pagina después de filtrar.
+
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
 You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
