@@ -81,6 +81,11 @@ export function getPlatforms(signal) {
   return listAll("/api/platforms/", { ordering: "name" }, signal);
 }
 
+export async function getHarvestSourceCount(signal) {
+  const page = await list("/api/platforms/", { is_harvestable: true, page: 1, page_size: 1 }, signal);
+  return page.total_items;
+}
+
 export function getHarvests(page, signal) {
   return list("/api/harvesting/harvests/", { page, page_size: 10, ordering: "-created_at" }, signal);
 }
