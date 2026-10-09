@@ -13,14 +13,19 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 First, run the development server:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
 pnpm dev
-# or
-bun dev
 ```
+
+Las vistas de cosecha usan la API real en `https://repositorio-biblioteca-backend.onrender.com` por defecto. Para cambiar el backend, configura `NEXT_PUBLIC_API_URL` antes de iniciar el servidor o compilar. Next.js incorpora esta dirección al código del navegador durante la compilación.
+
+Para generar y ejecutar la versión de producción:
+
+```bash
+pnpm build
+pnpm start
+```
+
+La ejecución inmediata llama a `POST /api/harvesting/schedules/run-due/`, que procesa todas las programaciones activas vencidas. La pausa y reanudación operan sobre cada ejecución mediante `/api/harvesting/harvests/{id}/pause/` y `/resume/`. Estas vistas no incluyen respuestas simuladas ni un backend de prueba.
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 

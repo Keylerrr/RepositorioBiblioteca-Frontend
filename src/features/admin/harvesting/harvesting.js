@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, "");
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://repositorio-biblioteca-backend.onrender.com").replace(/\/+$/, "");
 
 const FIELD_NAMES = {
   platforms: "Plataformas",
@@ -30,9 +30,9 @@ function errorMessage(payload, status) {
   return `La API respondió con un error (${status}). Intenta nuevamente.`;
 }
 
-async function request(path, { method = "GET", body, signal } = {}) {
-  if (!API_URL) throw new Error("No está configurada la dirección de la API (NEXT_PUBLIC_API_URL).");
-  const timeoutSignal = AbortSignal.timeout(method === "GET" ? 30000 : 90000);
+async function request(path, { method = "GET", body, signal, timeoutMs = method === "GET" ? 30000 : 90000 } = {}) {
+  const timeoutSignal = timeoutMs === null ? null : AbortSignal.timeout(timeoutMs);
+  const signals = [signal, timeoutSignal].filter(Boolean);
   try {
     const response = await fetch(`${API_URL}${path}`, {
       method,
@@ -41,7 +41,7 @@ async function request(path, { method = "GET", body, signal } = {}) {
         "Content-Type": "application/json",
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-      signal: signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal,
+      signal: signals.length ? AbortSignal.any(signals) : undefined,
       cache: "no-store",
     });
     const payload = await response.json().catch(() => null);
@@ -50,7 +50,7 @@ async function request(path, { method = "GET", body, signal } = {}) {
     return payload;
   } catch (error) {
     if (signal?.aborted) throw error;
-    if (timeoutSignal.aborted) throw new Error("La API tardó demasiado en responder. Actualiza la vista antes de repetir una acción para comprobar si se guardó.");
+    if (timeoutSignal?.aborted) throw new Error("La API tardó demasiado en responder. Actualiza la vista antes de repetir una acción para comprobar si se guardó.");
     if (error instanceof TypeError) throw new Error("No se pudo conectar con la API. Revisa tu conexión e intenta nuevamente.");
     throw error;
   }
@@ -126,7 +126,8 @@ export function createSchedule(payload) {
 }
 
 export async function runDueSchedules() {
-  const harvests = await request("/api/harvesting/schedules/run-due/", { method: "POST" });
+  // These endpoints can return after harvesting finishes; keep polling while the request is open.
+  const harvests = await request("/api/harvesting/schedules/run-due/", { method: "POST", timeoutMs: null });
   if (!Array.isArray(harvests)) throw new Error("La API no devolvió un resultado válido. Actualiza las ejecuciones antes de intentarlo nuevamente.");
   return harvests;
 }
@@ -136,7 +137,7 @@ export function pauseHarvest(id) {
 }
 
 export function resumeHarvest(id) {
-  return request(`/api/harvesting/harvests/${id}/resume/`, { method: "POST" });
+  return request(`/api/harvesting/harvests/${id}/resume/`, { method: "POST", timeoutMs: null });
 }
 
 export function describeDueRuns(harvests) {
