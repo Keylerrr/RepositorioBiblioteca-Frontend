@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Button from "@/shared/components/Button";
 import FormField from "@/shared/components/FormField";
 import Notice from "@/shared/components/Notice";
-import { buildSchedule, createSchedule, describeDueRuns, formatDate, getHarvestSources, getPlatforms, nextBogotaDate, runDueSchedules } from "@/features/admin/harvesting/harvesting";
+import { buildSchedule, createSchedule, describeDueRuns, formatDate, getHarvestSources, getPlatforms, nextBogotaDate, prepareImmediateSchedule, runDueSchedules } from "@/features/admin/harvesting/harvesting";
 import HarvestSourceOption from "./HarvestSourceOption";
 import HarvestScheduleRuns from "./HarvestScheduleRuns";
 
@@ -58,10 +58,11 @@ export default function HarvestForm() {
     return () => controller.abort();
   }, [revision]);
 
-  async function launch() {
+  async function launch(schedule) {
     setExecutionFeedback(null);
     setCanRetryStart(false);
     try {
+      setCreated(await prepareImmediateSchedule(schedule));
       setExecutionFeedback(describeDueRuns(await runDueSchedules()));
     } catch (error) {
       setExecutionFeedback({ variant: "error", message: `La programación quedó guardada, pero no se pudo confirmar el inicio. ${error.message} Revisa las ejecuciones antes de reintentar.` });
@@ -76,7 +77,7 @@ export default function HarvestForm() {
     requestPending.current = true;
     setSaving(true);
     try {
-      await launch();
+      await launch(created);
     } finally {
       requestPending.current = false;
       setSaving(false);
@@ -93,7 +94,7 @@ export default function HarvestForm() {
       setSaving(true);
       const schedule = await createSchedule(payload);
       setCreated(schedule);
-      if (mode === "now") await launch();
+      if (mode === "now") await launch(schedule);
     } catch (error) {
       setError(error.message);
     } finally {
@@ -142,7 +143,7 @@ export default function HarvestForm() {
                 <FormField id="harvest-timezone" label="Zona horaria" value="America/Bogota" readOnly />
               </div>
             </section>
-            <Notice>{selectedSource ? `La cosecha de ${selectedSource.name}` : "La cosecha"} tendrá {limit ? `un límite de ${limit} revistas` : "límite por tiempo"}{minutes ? ` y hasta ${minutes} minutos` : ""}. La ejecución se procesará en el backend.</Notice>
+            <Notice>{selectedSource ? `La cosecha de ${selectedSource.name}` : "La cosecha"} tendrá {limit ? `un límite de ${limit} ${Number(limit) === 1 ? "revista" : "revistas"}` : "límite por tiempo"}{minutes ? ` y hasta ${minutes} ${Number(minutes) === 1 ? "minuto" : "minutos"}` : ""}. La ejecución se procesará en el backend.</Notice>
           </fieldset>
           {sourceError && <Button variant="quiet" className="self-start" onClick={() => { setLoading(true); setRevision((current) => current + 1); }}>Reintentar carga</Button>}
           <div className="flex flex-wrap items-center gap-3">

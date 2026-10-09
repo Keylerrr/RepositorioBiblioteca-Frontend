@@ -25,7 +25,7 @@ pnpm build
 pnpm start
 ```
 
-La ejecución inmediata llama a `POST /api/harvesting/schedules/run-due/`, que procesa todas las programaciones activas vencidas. La pausa y reanudación operan sobre cada ejecución mediante `/api/harvesting/harvests/{id}/pause/` y `/resume/`. Estas vistas no incluyen respuestas simuladas ni un backend de prueba.
+La ejecución inmediata crea una programación única, ajusta su `start_date` al `created_at` devuelto por el backend mediante `PATCH /api/harvesting/schedules/{id}/` y llama a `POST /api/harvesting/schedules/run-due/`, que procesa todas las programaciones activas vencidas. Usar la hora del backend evita que un reloj adelantado en el navegador deje la cosecha pendiente. La pausa y reanudación operan sobre cada ejecución mediante `/api/harvesting/harvests/{id}/pause/` y `/resume/`. Estas vistas no incluyen respuestas simuladas ni un backend de prueba.
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 

@@ -125,6 +125,21 @@ export function createSchedule(payload) {
   return request("/api/harvesting/schedules/", { method: "POST", body: payload });
 }
 
+export function buildImmediateScheduleUpdate(schedule) {
+  if (!schedule?.created_at || !Number.isFinite(Date.parse(schedule.created_at))) {
+    throw new Error("La API no devolvió una fecha de creación válida. Actualiza la programación antes de reintentar su inicio.");
+  }
+  // Use the backend's own timestamp so browser clock drift cannot postpone an immediate run.
+  return { start_date: schedule.created_at };
+}
+
+export function prepareImmediateSchedule(schedule) {
+  return request(`/api/harvesting/schedules/${schedule.id}/`, {
+    method: "PATCH",
+    body: buildImmediateScheduleUpdate(schedule),
+  });
+}
+
 export async function runDueSchedules() {
   // These endpoints can return after harvesting finishes; keep polling while the request is open.
   const harvests = await request("/api/harvesting/schedules/run-due/", { method: "POST", timeoutMs: null });
