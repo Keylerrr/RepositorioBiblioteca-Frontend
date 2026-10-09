@@ -136,14 +136,12 @@ export default function HarvestForm() {
                 <label className={`flex cursor-pointer items-center gap-[5px] ${mode === "now" ? "text-[#A90D27]" : "text-[#68707C]"}`}><input className={radioClasses} type="radio" name="mode" value="now" checked={mode === "now"} onChange={() => setMode("now")} />Ejecutar una vez ahora</label>
                 <label className={`flex cursor-pointer items-center gap-[5px] ${mode === "scheduled" ? "text-[#A90D27]" : "text-[#68707C]"}`}><input className={radioClasses} type="radio" name="mode" value="scheduled" checked={mode === "scheduled"} onChange={() => setMode("scheduled")} />Programar cosecha</label>
               </div>
-              {mode === "now" && <Notice>Se guardará una programación única con inicio ahora. Pulsa Actualizar ejecuciones para ejecutar todas las programaciones vencidas, incluidas otras que estén pendientes. Podrás pausar o reanudar tu cosecha cuando aparezca su ejecución.</Notice>}
               <div className="grid grid-cols-1 gap-4 min-[901px]:grid-cols-3">
                 <FormField id="harvest-start" label="Fecha y hora inicial" type="datetime-local" required={mode === "scheduled"} disabled={mode === "now"} value={startDate} onChange={(event) => setStartDate(event.target.value)} />
                 <FormField id="harvest-frequency" label="Frecuencia" options={frequencies} disabled={mode === "now"} value={frequency} onChange={(event) => setFrequency(event.target.value)} />
                 <FormField id="harvest-timezone" label="Zona horaria" value="America/Bogota" readOnly />
               </div>
             </section>
-            <Notice>{selectedSource ? `La cosecha de ${selectedSource.name}` : "La cosecha"} tendrá {limit ? `un límite de ${limit} ${Number(limit) === 1 ? "revista" : "revistas"}` : "límite por tiempo"}{minutes ? ` y hasta ${minutes} ${Number(minutes) === 1 ? "minuto" : "minutos"}` : ""}. La ejecución se procesará en el backend.</Notice>
           </fieldset>
           {sourceError && <Button variant="quiet" className="self-start" onClick={() => { setLoading(true); setRevision((current) => current + 1); }}>Reintentar carga</Button>}
           <div className="flex flex-wrap items-center gap-3">
