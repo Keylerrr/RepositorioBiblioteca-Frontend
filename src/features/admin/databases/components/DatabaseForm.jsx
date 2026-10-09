@@ -67,17 +67,15 @@ export default function DatabaseForm({ initialData = null, isEdit = false }) {
             base_api_url: initialData.base_api_url || "",
             api_key: "", // Write-only, never returned by backend
             url_image: initialData.url_image || "",
-            start_period: initialData.start_period || "",
-            finish_period: initialData.finish_period || "",
+            start_period: String(initialData.start_period || "").slice(0, 10),
+            finish_period: String(initialData.finish_period || "").slice(0, 10),
             requires_registration: Boolean(initialData.requires_registration),
             has_access_text: Boolean(initialData.has_access_text),
-            valid_sintaxis: typeof initialData.valid_sintaxis === "object" 
-              ? initialData.valid_sintaxis.id 
-              : initialData.valid_sintaxis || (catData.sintaxis[0]?.id || ""),
-            institutions: extractIds(initialData.institutions, catData.institutions),
-            languages: extractIds(initialData.languages, catData.languages),
-            countries: extractIds(initialData.countries, catData.countries),
-            material_types: extractIds(initialData.material_types, catData.materialTypes),
+            valid_sintaxis: initialData.valid_sintaxis?.id || initialData.valid_sintaxis || "",
+            institutions: extractIds(initialData.institutions),
+            languages: extractIds(initialData.languages),
+            countries: extractIds(initialData.countries),
+            material_types: extractIds(initialData.material_types),
           });
         } else {
           setFormData((prev) => ({
@@ -98,11 +96,16 @@ export default function DatabaseForm({ initialData = null, isEdit = false }) {
     loadData();
   }, [initialData]);
 
-  function extractIds(list, catalog) {
-    if (!list || !Array.isArray(list)) {
-      return catalog.length > 0 ? [catalog[0].id] : [];
-    }
-    return list.map((item) => (typeof item === "object" ? item.id : Number(item)));
+  function extractIds(list) {
+    if (!list || !Array.isArray(list) || list.length === 0) return [];
+    return list
+      .map((item) => {
+        if (item == null) return null;
+        if (typeof item === "object") return item.id ?? null;
+        const parsed = Number(item);
+        return Number.isNaN(parsed) ? null : parsed;
+      })
+      .filter((id) => id !== null && id !== undefined && id !== "");
   }
 
   // Multi-select toggle handler
