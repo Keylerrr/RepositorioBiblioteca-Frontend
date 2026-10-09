@@ -127,7 +127,7 @@ export default function HarvestDashboard() {
         <section className="flex flex-col gap-3.5 rounded-xl border border-[#DCE0E5] bg-white p-5" aria-labelledby="schedules-title" aria-busy={loading}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 id="schedules-title" className="text-[21px] leading-7 font-semibold min-[541px]:text-2xl min-[541px]:leading-8">Programaciones</h2>
-            <Button size="small" disabled={loading || executing} onClick={executeDue}>{executing ? "Ejecutando…" : "Ejecutar programaciones vencidas"}</Button>
+            <Button size="small" disabled={loading || executing} onClick={executeDue}>{executing ? "Ejecutando…" : "Ejecutar cosechas manualmente"}</Button>
           </div>
           <p className="text-xs text-[#68707C]">Inicia ahora todas las programaciones activas cuya fecha ya venció, incluidas las de otras páginas. Las programaciones futuras conservan su fecha.</p>
           {executionFeedback && <Notice variant={executionFeedback.variant} live>{executionFeedback.message}</Notice>}
