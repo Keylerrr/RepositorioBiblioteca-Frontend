@@ -157,3 +157,45 @@ export const apiClient = {
     return handleResponse(response);
   },
 };
+
+// Same-origin requests let the browser read the CSRF cookie and keep the
+// session cookie; next.config.mjs proxies these routes to the configured API.
+async function accountsRequest(path, { method = "GET", body, signal } = {}) {
+  const headers = { Accept: "application/json" };
+  if (method !== "GET") {
+    await accountsRequest("auth/csrf/", { signal });
+    const cookie = document.cookie.split(";").find((item) => item.trim().startsWith("csrftoken="));
+    if (!cookie) throw new Error("No se pudo obtener el token de seguridad. Recarga la página e intenta nuevamente.");
+    headers["X-CSRFToken"] = decodeURIComponent(cookie.trim().slice("csrftoken=".length));
+  }
+  if (body !== undefined) headers["Content-Type"] = "application/json";
+  let response;
+  try {
+    response = await fetch(`/api/accounts/${path}`, {
+      method, headers, credentials: "include", cache: "no-store", signal,
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    });
+  } catch (error) {
+    if (error.name === "AbortError") throw error;
+    throw new Error("No se pudo conectar con el servidor. Revisa tu conexión e intenta nuevamente.");
+  }
+  if (response.status === 204) return null;
+  return handleResponse(response);
+}
+
+export function hasAccountPermission(user, action) {
+  return Boolean(user?.is_superadmin || user?.effective_permissions?.accounts?.users?.[action]);
+}
+
+export const accountsApi = {
+  me: (signal) => accountsRequest("auth/me/", { signal }),
+  login: (body) => accountsRequest("auth/login/", { method: "POST", body }),
+  logout: () => accountsRequest("auth/logout/", { method: "POST" }),
+  changePassword: (body) => accountsRequest("password/change/", { method: "POST", body }),
+  users: (signal) => accountsRequest("users/", { signal }),
+  user: (id, signal) => accountsRequest(`users/${encodeURIComponent(id)}/`, { signal }),
+  invite: (body) => accountsRequest("users/invite/", { method: "POST", body }),
+  deactivate: (id) => accountsRequest(`users/${encodeURIComponent(id)}/`, { method: "DELETE" }),
+  permissions: (signal) => accountsRequest("permissions/", { signal }),
+  savePermissions: (id, permissions) => accountsRequest(`users/${encodeURIComponent(id)}/permissions/`, { method: "PUT", body: { permissions } }),
+};
