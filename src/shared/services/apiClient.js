@@ -200,6 +200,7 @@ export function createAccountsApi(mutateAction) {
     invite: (body) => mutate("users/invite/", "POST", body),
     deactivate: (id) => mutate(`users/${encodeURIComponent(id)}/`, "DELETE"),
     permissions: (signal) => accountsRequest("permissions/", { signal }),
+    presets: (signal) => accountsRequest("presets/", { signal }),
     savePermissions: (id, permissions) => mutate(`users/${encodeURIComponent(id)}/permissions/`, "PUT", { permissions }),
   };
 }
