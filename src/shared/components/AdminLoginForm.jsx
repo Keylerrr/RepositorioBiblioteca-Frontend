@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import AccountFeedback from "@/shared/components/AccountFeedback";
-import { accountsApi } from "@/shared/services/apiClient";
+import { useAccountsApi } from "@/shared/components/AccountsProvider";
 
 function LoginField({ id, label, ...props }) {
   return <div className="space-y-2 rounded-md border border-gray-200 px-3 py-2 shadow-sm focus-within:border-gray-400 focus-within:ring-1 focus-within:ring-gray-400">
@@ -17,6 +17,7 @@ function LoginField({ id, label, ...props }) {
 }
 
 export default function AdminLoginForm() {
+  const accountsApi = useAccountsApi();
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -35,7 +36,7 @@ export default function AdminLoginForm() {
       }
     }).catch(() => {});
     return () => controller.abort();
-  }, []);
+  }, [accountsApi]);
 
   async function submit(event) {
     event.preventDefault();

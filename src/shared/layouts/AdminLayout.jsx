@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { accountsApi } from "@/shared/services/apiClient";
+import { useAccountsApi } from "@/shared/components/AccountsProvider";
 import { 
   LayoutGrid, 
   Book, 
@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 
 export default function AdminLayout({ children }) {
+  const accountsApi = useAccountsApi();
   const pathname = usePathname();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);

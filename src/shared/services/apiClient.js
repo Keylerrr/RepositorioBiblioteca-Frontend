@@ -158,15 +158,16 @@ export const apiClient = {
   },
 };
 
-// Same-origin requests let the browser read the CSRF cookie and keep the
-// session cookie; next.config.mjs proxies these routes to the configured API.
-async function accountsRequest(path, { method = "GET", body, signal } = {}) {
+// Read-only requests use the same-origin proxy. Mutations run through the
+// Server Action supplied by AccountsGateway, which owns session and CSRF cookies.
+async function accountsRequest(path, { method = "GET", body, signal } = {}, mutateAction) {
   const headers = { Accept: "application/json" };
   if (method !== "GET") {
-    await accountsRequest("auth/csrf/", { signal });
-    const cookie = document.cookie.split(";").find((item) => item.trim().startsWith("csrftoken="));
-    if (!cookie) throw new Error("No se pudo obtener el token de seguridad. Recarga la página e intenta nuevamente.");
-    headers["X-CSRFToken"] = decodeURIComponent(cookie.trim().slice("csrftoken=".length));
+    const result = await mutateAction(path, method, body);
+    if (result.status === 204) return null;
+    return handleResponse(new Response(JSON.stringify(result.data), {
+      status: result.status, headers: { "Content-Type": "application/json" },
+    }));
   }
   if (body !== undefined) headers["Content-Type"] = "application/json";
   let response;
@@ -187,15 +188,18 @@ export function hasAccountPermission(user, action) {
   return Boolean(user?.is_superadmin || user?.effective_permissions?.accounts?.users?.[action]);
 }
 
-export const accountsApi = {
-  me: (signal) => accountsRequest("auth/me/", { signal }),
-  login: (body) => accountsRequest("auth/login/", { method: "POST", body }),
-  logout: () => accountsRequest("auth/logout/", { method: "POST" }),
-  changePassword: (body) => accountsRequest("password/change/", { method: "POST", body }),
-  users: (signal) => accountsRequest("users/", { signal }),
-  user: (id, signal) => accountsRequest(`users/${encodeURIComponent(id)}/`, { signal }),
-  invite: (body) => accountsRequest("users/invite/", { method: "POST", body }),
-  deactivate: (id) => accountsRequest(`users/${encodeURIComponent(id)}/`, { method: "DELETE" }),
-  permissions: (signal) => accountsRequest("permissions/", { signal }),
-  savePermissions: (id, permissions) => accountsRequest(`users/${encodeURIComponent(id)}/permissions/`, { method: "PUT", body: { permissions } }),
-};
+export function createAccountsApi(mutateAction) {
+  const mutate = (path, method, body) => accountsRequest(path, { method, body }, mutateAction);
+  return {
+    me: (signal) => accountsRequest("auth/me/", { signal }),
+    login: (body) => mutate("auth/login/", "POST", body),
+    logout: () => mutate("auth/logout/", "POST"),
+    changePassword: (body) => mutate("password/change/", "POST", body),
+    users: (signal) => accountsRequest("users/", { signal }),
+    user: (id, signal) => accountsRequest(`users/${encodeURIComponent(id)}/`, { signal }),
+    invite: (body) => mutate("users/invite/", "POST", body),
+    deactivate: (id) => mutate(`users/${encodeURIComponent(id)}/`, "DELETE"),
+    permissions: (signal) => accountsRequest("permissions/", { signal }),
+    savePermissions: (id, permissions) => mutate(`users/${encodeURIComponent(id)}/permissions/`, "PUT", { permissions }),
+  };
+}

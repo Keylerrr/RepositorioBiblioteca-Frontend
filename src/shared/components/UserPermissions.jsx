@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import Button from "@/shared/components/Button";
 import AccountFeedback from "@/shared/components/AccountFeedback";
-import { accountsApi, hasAccountPermission } from "@/shared/services/apiClient";
+import { hasAccountPermission } from "@/shared/services/apiClient";
+import { useAccountsApi } from "@/shared/components/AccountsProvider";
 
 const rule = (section, resource, actions) => actions.map((action) => [section, resource, action]);
 const GROUPS = [
@@ -71,6 +72,7 @@ function inheritedPermissions(user) {
 }
 
 export default function UserPermissions({ userId, initialUser, onDone }) {
+  const accountsApi = useAccountsApi();
   const [data, setData] = useState(null);
   const [permissions, setPermissions] = useState({});
   const [loading, setLoading] = useState(true);
@@ -109,7 +111,7 @@ export default function UserPermissions({ userId, initialUser, onDone }) {
     }
     load();
     return () => controller.abort();
-  }, [userId, refresh]);
+  }, [accountsApi, userId, refresh]);
 
   const editable = data && hasAccountPermission(data.viewer, "manage_permissions") && !data.user.is_superadmin;
   const groups = GROUPS.map((group) => ({ ...group, items: group.items.map((item) => ({

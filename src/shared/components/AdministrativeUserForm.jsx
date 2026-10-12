@@ -4,12 +4,14 @@ import { useEffect, useState } from "react";
 import Button from "@/shared/components/Button";
 import FormField from "@/shared/components/FormField";
 import AccountFeedback from "@/shared/components/AccountFeedback";
-import { accountsApi, hasAccountPermission } from "@/shared/services/apiClient";
+import { hasAccountPermission } from "@/shared/services/apiClient";
+import { useAccountsApi } from "@/shared/components/AccountsProvider";
 
 const outline = "!h-[42px] !border-[#C8102E] !text-[#C8102E]";
 const primary = "!h-[42px] !border-[#C8102E] !bg-[#C8102E] hover:!bg-[#A80D27]";
 
 export default function AdministrativeUserForm() {
+  const accountsApi = useAccountsApi();
   const [viewer, setViewer] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -41,7 +43,7 @@ export default function AdministrativeUserForm() {
     }
     load();
     return () => controller.abort();
-  }, [refresh]);
+  }, [accountsApi, refresh]);
 
   const canInvite = hasAccountPermission(viewer, "invite");
   function update(event) {

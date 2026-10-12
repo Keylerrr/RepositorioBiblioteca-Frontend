@@ -5,13 +5,15 @@ import { useRouter } from "next/navigation";
 import Button from "@/shared/components/Button";
 import FormField from "@/shared/components/FormField";
 import AccountFeedback from "@/shared/components/AccountFeedback";
-import { accountsApi, hasAccountPermission } from "@/shared/services/apiClient";
+import { hasAccountPermission } from "@/shared/services/apiClient";
+import { useAccountsApi } from "@/shared/components/AccountsProvider";
 
 const PAGE_SIZE = 10;
 const buttonStyle = "!border-[#C8102E] !text-[#C8102E]";
 const primaryStyle = "!border-[#C8102E] !bg-[#C8102E] hover:!bg-[#A80D27]";
 
 function DeactivateDialog({ user, onClose, onDeleted }) {
+  const accountsApi = useAccountsApi();
   const dialog = useRef(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -41,6 +43,7 @@ function DeactivateDialog({ user, onClose, onDeleted }) {
 }
 
 export default function AdministrativeUsers() {
+  const accountsApi = useAccountsApi();
   const router = useRouter();
   const [users, setUsers] = useState([]);
   const [viewer, setViewer] = useState(null);
@@ -81,7 +84,7 @@ export default function AdministrativeUsers() {
     }
     load();
     return () => controller.abort();
-  }, [refresh]);
+  }, [accountsApi, refresh]);
 
   const term = search.trim().toLocaleLowerCase("es");
   const filtered = users.filter((user) =>

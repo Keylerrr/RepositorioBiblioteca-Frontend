@@ -1,8 +1,9 @@
 import AdminLoginForm from "@/shared/components/AdminLoginForm";
+import AccountsGateway from "@/shared/components/AccountsGateway";
 
 export default function AdminLoginPage() {
   return (
-    <div className="min-h-screen w-full flex bg-[#F8F9FA]">
+    <AccountsGateway><div className="min-h-screen w-full flex bg-[#F8F9FA]">
       {/* Panel Izquierdo - Informativo */}
       <div className="hidden lg:flex flex-col justify-between w-1/2 bg-[#C8102E] p-12 text-white">
         <div>
@@ -30,6 +31,6 @@ export default function AdminLoginPage() {
       <div className="flex-1 flex items-center justify-center p-6">
         <AdminLoginForm />
       </div>
-    </div>
+    </div></AccountsGateway>
   )
 }
