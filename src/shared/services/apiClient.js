@@ -188,19 +188,25 @@ export function hasAccountPermission(user, action) {
   return Boolean(user?.is_superadmin || user?.effective_permissions?.accounts?.users?.[action]);
 }
 
+// Reads do not depend on the Server Action reference, which can change when
+// Next.js refreshes session cookies. Keep these callbacks stable for effects.
+const accountQueries = {
+  me: (signal) => accountsRequest("auth/me/", { signal }),
+  users: (signal) => accountsRequest("users/", { signal }),
+  user: (id, signal) => accountsRequest(`users/${encodeURIComponent(id)}/`, { signal }),
+  permissions: (signal) => accountsRequest("permissions/", { signal }),
+  presets: (signal) => accountsRequest("presets/", { signal }),
+};
+
 export function createAccountsApi(mutateAction) {
   const mutate = (path, method, body) => accountsRequest(path, { method, body }, mutateAction);
   return {
-    me: (signal) => accountsRequest("auth/me/", { signal }),
+    ...accountQueries,
     login: (body) => mutate("auth/login/", "POST", body),
     logout: () => mutate("auth/logout/", "POST"),
     changePassword: (body) => mutate("password/change/", "POST", body),
-    users: (signal) => accountsRequest("users/", { signal }),
-    user: (id, signal) => accountsRequest(`users/${encodeURIComponent(id)}/`, { signal }),
     invite: (body) => mutate("users/invite/", "POST", body),
     deactivate: (id) => mutate(`users/${encodeURIComponent(id)}/`, "DELETE"),
-    permissions: (signal) => accountsRequest("permissions/", { signal }),
-    presets: (signal) => accountsRequest("presets/", { signal }),
     savePermissions: (id, permissions) => mutate(`users/${encodeURIComponent(id)}/permissions/`, "PUT", { permissions }),
   };
 }
