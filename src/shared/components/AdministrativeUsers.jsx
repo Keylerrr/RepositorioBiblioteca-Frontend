@@ -112,9 +112,9 @@ export default function AdministrativeUsers() {
       {error && <AccountFeedback error={error} sessionRequired={sessionRequired} retry={() => setRefresh((value) => value + 1)} />}
       <div className="min-h-[388px] rounded-[10px] bg-white px-4" aria-busy={loading}>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1000px] table-fixed text-left text-xs">
+          <table className="w-full min-w-[1100px] table-fixed text-left text-xs">
             <caption className="sr-only">Usuarios administrativos del directorio</caption>
-            <colgroup>{[6, 14, 23, 14, 14, 9, 20].map((width, index) => <col key={index} style={{ width: `${width}%` }} />)}</colgroup>
+            <colgroup>{[6, 10, 22, 13, 15, 7, 27].map((width, index) => <col key={index} style={{ width: `${width}%` }} />)}</colgroup>
             <thead className="h-[46px] border-b border-[#D1D6E0] bg-[#F2F5FA]">
               <tr>{["ID", "Código", "Nombre completo", "Creado el", "Creado por", "Estado", "Acciones"].map((label) => <th scope="col" key={label} className="px-2.5 font-semibold">{label}</th>)}</tr>
             </thead>
@@ -129,6 +129,7 @@ export default function AdministrativeUsers() {
                   <td className="px-2.5">{user.created_by?.full_name || (typeof user.created_by === "string" ? user.created_by : "—")}</td>
                   <td className={`px-2.5 font-semibold ${user.is_active ? "text-[#1F8C52]" : "text-[#6B758A]"}`}>{user.is_active ? "Activo" : "Inactivo"}</td>
                   <td className="px-1"><div className="flex gap-1.5">
+                    {hasAccountPermission(viewer, "edit") && <Button size="small" variant="outline" href={`/admin/usuarios?vista=editar&usuario=${encodeURIComponent(user.id)}`} className={buttonStyle} aria-label={`Editar a ${user.full_name || user.email}`}>Editar</Button>}
                     <Button size="small" variant="outline" href={`/admin/usuarios?vista=permisos&usuario=${encodeURIComponent(user.id)}`} className={buttonStyle}>Permisos</Button>
                     {hasAccountPermission(viewer, "delete") && <Button size="sm" className={primaryStyle} disabled={user.is_superadmin || !user.is_active} onClick={() => setSelected(user)} aria-label={`Eliminar a ${user.full_name || user.email}`}>Eliminar</Button>}
                   </div></td>
