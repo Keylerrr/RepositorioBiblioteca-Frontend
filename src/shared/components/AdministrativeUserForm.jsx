@@ -10,8 +10,10 @@ import { useAccountsApi } from "@/shared/components/AccountsProvider";
 const outline = "!h-[42px] !border-[#C8102E] !text-[#C8102E]";
 const primary = "!h-[42px] !border-[#C8102E] !bg-[#C8102E] hover:!bg-[#A80D27]";
 
-export default function AdministrativeUserForm() {
+export default function AdministrativeUserForm({ userId }) {
   const accountsApi = useAccountsApi();
+  const { me: getViewer, user: getUser } = accountsApi;
+  const editing = Boolean(userId);
   const [viewer, setViewer] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -19,6 +21,7 @@ export default function AdministrativeUserForm() {
   const [sessionRequired, setSessionRequired] = useState(false);
   const [refresh, setRefresh] = useState(0);
   const [createdUser, setCreatedUser] = useState(null);
+  const [originalUser, setOriginalUser] = useState(null);
   const [form, setForm] = useState({ collegue_code: "", full_name: "", email: "" });
 
   useEffect(() => {
@@ -28,38 +31,49 @@ export default function AdministrativeUserForm() {
       setError(null);
       setSessionRequired(false);
       setViewer(null);
+      setOriginalUser(null);
+      let authenticated = false;
       try {
-        const current = await accountsApi.me(controller.signal);
+        const current = await getViewer(controller.signal);
+        authenticated = true;
         if (current.force_password_change) throw new Error("Debes cambiar tu contraseña provisional desde el inicio de sesión.");
         setViewer(current);
-        if (!hasAccountPermission(current, "invite")) throw new Error("Tu cuenta no tiene autorización para crear usuarios administrativos.");
+        if (!hasAccountPermission(current, editing ? "edit" : "invite")) throw new Error(`Tu cuenta no tiene autorización para ${editing ? "editar" : "crear"} usuarios administrativos.`);
+        if (editing) {
+          if (!hasAccountPermission(current, "view")) throw new Error("Tu cuenta no tiene permiso para consultar usuarios administrativos.");
+          const user = await getUser(userId, controller.signal);
+          if (controller.signal.aborted) return;
+          setOriginalUser(user);
+          setForm({ collegue_code: user.collegue_code || "", full_name: user.full_name || "", email: user.email || "" });
+        }
       } catch (error) {
         if (controller.signal.aborted) return;
         setError(error);
-        setSessionRequired([401, 403].includes(error.status));
+        setSessionRequired(!authenticated && [401, 403].includes(error.status));
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
     }
     load();
     return () => controller.abort();
-  }, [accountsApi, refresh]);
+  }, [getViewer, getUser, editing, userId, refresh]);
 
-  const canInvite = hasAccountPermission(viewer, "invite");
+  const canSubmit = hasAccountPermission(viewer, editing ? "edit" : "invite") && (!editing || Boolean(originalUser));
   function update(event) {
     setForm((current) => ({ ...current, [event.target.name]: event.target.value }));
   }
 
   async function submit(event) {
     event.preventDefault();
-    if (!canInvite || busy || createdUser) return;
+    if (!canSubmit || loading || busy || createdUser) return;
     setBusy(true);
     setError(null);
     try {
-      const user = await accountsApi.invite({
+      const body = {
         email: form.email.trim(), full_name: form.full_name.trim(), collegue_code: form.collegue_code.trim(),
-      });
-      setCreatedUser(user);
+      };
+      const user = editing ? await accountsApi.updateUser(userId, body) : await accountsApi.invite(body);
+      setCreatedUser(editing ? { ...originalUser, ...body, ...user } : user);
     } catch (error) {
       setError(error);
     } finally {
@@ -69,19 +83,19 @@ export default function AdministrativeUserForm() {
 
   return (
     <section className="text-[#1F242E]">
-      <h1 className="text-[30px] leading-[41px] font-bold">Crear usuario administrativo</h1>
-      <p className="mt-2 text-[13px] text-[#68707C]">Estado inicial: Activo · El alta y los cambios posteriores quedarán registrados en la bitácora.</p>
+      <h1 className="text-[30px] leading-[41px] font-bold">{editing ? "Editar" : "Crear"} usuario administrativo</h1>
+      <p className="mt-2 text-[13px] text-[#68707C]">{editing ? `${originalUser?.full_name || originalUser?.email || "Usuario administrativo"} · Código ${originalUser?.collegue_code || "—"} · Los cambios quedarán registrados en la bitácora.` : "Estado inicial: Activo · El alta y los cambios posteriores quedarán registrados en la bitácora."}</p>
       {loading && <p role="status" className="mt-6 rounded-lg bg-white p-6 text-sm text-[#6B758A]">Verificando acceso…</p>}
-      {error && <div className="mt-5"><AccountFeedback error={error} sessionRequired={sessionRequired} retry={!viewer ? () => setRefresh((value) => value + 1) : undefined} /></div>}
+      {error && <div className="mt-5"><AccountFeedback error={error} sessionRequired={sessionRequired} retry={!viewer || (editing && !originalUser) ? () => setRefresh((value) => value + 1) : undefined} /></div>}
       {createdUser ? <div className="mt-8 space-y-5 rounded-[10px] bg-white p-6">
-        <p role="status" className="rounded-lg bg-[#E8FAF0] p-4 text-sm text-[#0F8C45]">Se creó la cuenta de {createdUser.full_name || createdUser.email}. La contraseña provisional fue enviada a {createdUser.email}.</p>
-        <p className="text-sm text-[#6B758A]">La cuenta no tiene permisos todavía. Deberá cambiar su contraseña al iniciar sesión por primera vez.</p>
+        <p role="status" className="rounded-lg bg-[#E8FAF0] p-4 text-sm text-[#0F8C45]">{editing ? `Se guardaron los cambios de ${createdUser.full_name || createdUser.email}.` : `Se creó la cuenta de ${createdUser.full_name || createdUser.email}. La contraseña provisional fue enviada a ${createdUser.email}.`}</p>
+        {!editing && <p className="text-sm text-[#6B758A]">La cuenta no tiene permisos todavía. Deberá cambiar su contraseña al iniciar sesión por primera vez.</p>}
         <div className="flex flex-wrap gap-3">
           <Button variant="outline" className={outline} href="/admin/usuarios">Volver a usuarios</Button>
           {hasAccountPermission(viewer, "manage_permissions") && hasAccountPermission(viewer, "view") && <Button className={primary} href={`/admin/usuarios?vista=permisos&usuario=${encodeURIComponent(createdUser.id)}`}>Configurar permisos</Button>}
         </div>
       </div> : <form onSubmit={submit} className="mt-7 space-y-7" aria-busy={busy}>
-        <fieldset disabled={loading || busy || !canInvite}>
+        <fieldset disabled={loading || busy || !canSubmit}>
           <legend className="mb-2 text-base font-semibold">Datos personales</legend>
           <div className="grid gap-3 md:grid-cols-3">
             <FormField compact id="user-code" label="Código institucional" name="collegue_code" placeholder="Ej. 10584" value={form.collegue_code} onChange={update} />
@@ -96,27 +110,28 @@ export default function AdministrativeUserForm() {
         <fieldset>
           <legend className="mb-2 text-base font-semibold">Acceso</legend>
           <div className="grid gap-3 md:grid-cols-3">
-            <FormField compact id="user-password" label="Contraseña provisional" value="Se genera y envía por correo" readOnly />
-            <FormField compact id="user-initial-status" label="Estado inicial" value="Activo" readOnly />
-            <FormField compact id="user-notification" label="Notificar por correo" value="Sí, al crear la cuenta" readOnly />
+            <FormField compact id="user-password" label={editing ? "Nueva contraseña (opcional)" : "Contraseña provisional"} value={editing ? "Se conserva la contraseña actual" : "Se genera y envía por correo"} readOnly />
+            <FormField compact id="user-initial-status" label={editing ? "Estado" : "Estado inicial"} value={editing ? originalUser ? originalUser.is_active ? "Activo" : "Inactivo" : "—" : "Activo"} readOnly />
+            <FormField compact id="user-notification" label={editing ? "Notificar cambios por correo" : "Notificar por correo"} value={editing ? "No disponible" : "Sí, al crear la cuenta"} readOnly />
           </div>
+          {editing && <p className="mt-2 text-xs text-[#6B758A]">Desde este formulario se actualizan los datos personales. La contraseña y el estado se conservan; las notificaciones de cambios aún no están disponibles.</p>}
         </fieldset>
         <fieldset>
           <legend className="mb-2 text-base font-semibold">Trazabilidad</legend>
           <div className="grid gap-3 md:grid-cols-3">
-            <FormField compact id="user-creator" label="Creado por" value={viewer?.full_name || viewer?.email || "Administrador actual"} readOnly />
-            <FormField compact id="user-created-at" label="Fecha de creación" value="Se asignará al guardar" readOnly />
+            <FormField compact id="user-creator" label="Creado por" value={editing ? originalUser?.created_by?.full_name || (typeof originalUser?.created_by === "string" ? originalUser.created_by : "—") : viewer?.full_name || viewer?.email || "Administrador actual"} readOnly />
+            <FormField compact id="user-created-at" label="Fecha de creación" value={editing ? originalUser?.created_at ? new Date(originalUser.created_at).toLocaleDateString("es-CO", { day: "2-digit", month: "short", year: "numeric" }) : "—" : "Se asignará al guardar"} readOnly />
           </div>
         </fieldset>
         <div>
           <h2 className="text-base font-semibold">Permisos individuales</h2>
-          <p className="mt-2 text-xs text-[#6B758A]">Los permisos se asignan por usuario y podrán configurarse después del alta. La cuenta se crea sin permisos.</p>
-          <Button variant="outline" className={`${outline} mt-4`} disabled aria-describedby="permissions-after-create">Configurar permisos</Button>
-          <p id="permissions-after-create" className="mt-2 text-xs text-[#6B758A]">Disponible después de crear el usuario, si tienes autorización para configurar permisos.</p>
+          <p className="mt-2 text-xs text-[#6B758A]">{editing ? "Los permisos se configuran por usuario. Los cambios de datos y accesos quedarán registrados en la bitácora." : "Los permisos se asignan por usuario y podrán configurarse después del alta. La cuenta se crea sin permisos."}</p>
+          {editing && originalUser && !busy && hasAccountPermission(viewer, "manage_permissions") ? <Button variant="outline" className={`${outline} mt-4`} href={`/admin/usuarios?vista=permisos&usuario=${encodeURIComponent(userId)}`}>Configurar permisos</Button> : <Button variant="outline" className={`${outline} mt-4`} disabled aria-describedby={editing ? undefined : "permissions-after-create"}>Configurar permisos</Button>}
+          {!editing && <p id="permissions-after-create" className="mt-2 text-xs text-[#6B758A]">Disponible después de crear el usuario, si tienes autorización para configurar permisos.</p>}
         </div>
         <div className="flex flex-wrap justify-end gap-3 pt-2">
           <Button href="/admin/usuarios" variant="outline" className={outline}>Cancelar</Button>
-          <Button type="submit" className={`${primary} min-w-40`} disabled={loading || busy || !canInvite}>{busy ? "Creando usuario…" : "Crear usuario"}</Button>
+          <Button type="submit" className={`${primary} min-w-40`} disabled={loading || busy || !canSubmit}>{busy ? editing ? "Guardando cambios…" : "Creando usuario…" : editing ? "Guardar cambios" : "Crear usuario"}</Button>
         </div>
       </form>}
     </section>
