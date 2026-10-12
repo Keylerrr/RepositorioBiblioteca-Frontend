@@ -98,7 +98,14 @@ export default function AccountsGateway({ children }) {
         cache: "no-store", signal: AbortSignal.timeout(90000), redirect: "error",
       });
       transferCookies(response, store, jar, secure);
-      return { status: response.status, data: await responseData(response) };
+      const data = await responseData(response);
+      if (process.env.NODE_ENV === "development" && path === "users/invite/" && !response.ok) {
+        const safeData = JSON.stringify(data, (key, value) =>
+          /password|token|secret|cookie|authorization/i.test(key) ? "[REDACTADO]" : value,
+        );
+        console.error(`[accounts/users/invite] HTTP ${response.status}: ${safeData}`);
+      }
+      return { status: response.status, data };
     } catch {
       return { status: 502, data: { detail: "No se pudo completar la solicitud al servidor. Comprueba el estado de la cuenta antes de repetir la operación." } };
     }
