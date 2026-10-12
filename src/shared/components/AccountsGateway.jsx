@@ -7,6 +7,7 @@ const ALLOWED_MUTATIONS = [
   ["POST", /^auth\/(login|logout)\/$/],
   ["POST", /^password\/change\/$/],
   ["POST", /^users\/invite\/$/],
+  ["PATCH", /^users\/\d+\/$/],
   ["DELETE", /^users\/\d+\/$/],
   ["PUT", /^users\/\d+\/permissions\/$/],
 ];
