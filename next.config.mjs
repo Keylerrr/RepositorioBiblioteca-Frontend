@@ -2,6 +2,8 @@
 const nextConfig = {
   /* config options here */
   reactCompiler: true,
+  // Server Function arguments include passwords during authentication.
+  logging: { serverFunctions: false },
   // Django's accounts endpoints require their trailing slash, including POSTs.
   skipTrailingSlashRedirect: true,
   async rewrites() {
