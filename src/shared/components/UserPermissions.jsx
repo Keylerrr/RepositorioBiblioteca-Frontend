@@ -4,38 +4,37 @@ import { useEffect, useState } from "react";
 import Button from "@/shared/components/Button";
 import AccountFeedback from "@/shared/components/AccountFeedback";
 import UserPresetSelector from "@/shared/components/UserPresetSelector";
+import UserPermissionMatrix from "@/shared/components/UserPermissionMatrix";
 import { hasAccountPermission } from "@/shared/services/apiClient";
 import { useAccountsApi } from "@/shared/components/AccountsProvider";
-
-const rule = (section, resource, actions) => actions.map((action) => [section, resource, action]);
-const GROUPS = [
-  { title: "Contenido y recursos", items: [
-    { label: "Gestionar bases de datos", rules: rule("platforms", "platforms", ["view", "create", "update", "delete", "restore"]) },
-    { label: "Gestionar revistas", rules: rule("journals", "journals", ["view", "create", "update", "delete", "restore"]) },
-    { label: "Aprobar revistas", rules: rule("journals", "journals", ["publish"]) },
-    { label: "Editar clasificación y programas", rules: ["knowledge-areas", "academic-programs"].flatMap((resource) => rule("catalog", resource, ["view", "create", "update", "delete", "restore"])) },
-  ] },
-  { title: "Operación y supervisión", items: [
-    { label: "Ejecutar cosechas", rules: rule("harvesting", "schedules", ["view", "create", "update", "delete", "restore", "run_due"]) },
-    { label: "Gestionar alertas", rules: rule("platforms", "link-check-logs", ["view"]) },
-    { label: "Consultar bitácora", rules: rule("audit", "logs", ["view"]) },
-    { label: "Validar enlaces y disponibilidad", rules: rule("platforms", "platforms", ["check_link"]) },
-  ] },
-  { title: "Usuarios y seguridad", items: [
-    { label: "Crear usuarios administrativos", rules: rule("accounts", "users", ["invite"]) },
-    { label: "Configurar permisos", rules: rule("accounts", "users", ["manage_permissions"]) },
-    { label: "Retirar usuarios administrativos", rules: rule("accounts", "users", ["delete"]) },
-  ] },
-  { title: "Inteligencia y analítica", items: [
-    { label: "Configurar módulo de IA", rules: [] },
-    { label: "Consultar analítica de chats", rules: [] },
-    { label: "Ver detalle de conversaciones", rules: [] },
-  ] },
-];
 
 function actionsFor(catalog, section, resource) {
   const entry = catalog?.[section]?.[resource];
   return Array.isArray(entry) ? entry : entry?.actions || [];
+}
+
+function normalizeCatalog(response) {
+  const source = response?.permissions ?? response;
+  const isObject = (value) => value && typeof value === "object" && !Array.isArray(value);
+  if (!isObject(source)) throw new Error("El servidor no devolvió un catálogo de permisos válido.");
+  return Object.fromEntries(Object.entries(source).map(([section, resources]) => {
+    if (!isObject(resources)) throw new Error("El catálogo contiene una categoría inválida.");
+    return [section, Object.fromEntries(Object.entries(resources).map(([resource, entry]) => {
+      const actions = Array.isArray(entry) ? entry : entry?.actions;
+      if (!Array.isArray(actions) || actions.some((action) => typeof action !== "string" || !action)) {
+        throw new Error("El catálogo contiene acciones inválidas.");
+      }
+      return [resource, [...new Set(actions)]];
+    }))];
+  }));
+}
+
+function permissionsForCatalog(permissions, catalog) {
+  return Object.fromEntries(Object.entries(catalog).map(([section, resources]) => [
+    section, Object.fromEntries(Object.entries(resources).map(([resource, actions]) => [
+      resource, Object.fromEntries(actions.map((action) => [action, permissions?.[section]?.[resource]?.[action] === true])),
+    ])),
+  ]));
 }
 
 function valueFor(permissions, [section, resource, action]) {
@@ -55,9 +54,9 @@ function presetPermissionsAreValid(permissions, catalog) {
   const isObject = (value) => value && typeof value === "object" && !Array.isArray(value);
   if (!isObject(permissions)) return false;
   for (const [section, resources] of Object.entries(permissions)) {
-    if (!isObject(resources)) return false;
+    if (!isObject(resources) || !Object.hasOwn(catalog, section)) return false;
     for (const [resource, actions] of Object.entries(resources)) {
-      if (!isObject(actions)) return false;
+      if (!isObject(actions) || !Object.hasOwn(catalog[section], resource)) return false;
       const availableActions = actionsFor(catalog, section, resource);
       if (Object.entries(actions).some(([action, value]) => typeof value !== "boolean" || !availableActions.includes(action))) return false;
     }
@@ -68,7 +67,7 @@ function presetPermissionsAreValid(permissions, catalog) {
 function inheritedPermissions(user) {
   const result = {};
   for (const preset of user.presets || []) {
-    for (const [section, resources] of Object.entries(preset.permissions || {})) {
+    for (const [section, resources] of Object.entries(preset?.permissions || {})) {
       for (const [resource, actions] of Object.entries(resources)) {
         for (const [action, enabled] of Object.entries(actions)) {
           if (enabled === true) {
@@ -127,10 +126,9 @@ export default function UserPermissions({ userId, initialUser, onDone }) {
         const [user, catalogResponse] = await Promise.all([
           getUser(userId, controller.signal), getCatalog(controller.signal),
         ]);
-        const catalog = catalogResponse.permissions || catalogResponse;
-        if (!catalog || typeof catalog !== "object" || Array.isArray(catalog)) throw new Error("El servidor no devolvió un catálogo de permisos válido.");
+        const catalog = normalizeCatalog(catalogResponse);
         setData({ viewer, user, catalog, inherited: inheritedPermissions(user) });
-        setPermissions(structuredClone(user.permissions || {}));
+        setPermissions(enableRequiredViews(permissionsForCatalog(user.permissions, catalog), catalog));
       } catch (error) {
         if (controller.signal.aborted) return;
         setError(error);
@@ -173,14 +171,14 @@ export default function UserPermissions({ userId, initialUser, onDone }) {
   }, [getPresets, viewer, presetsRefresh]);
 
   const editable = data && hasAccountPermission(data.viewer, "manage_permissions") && !data.user.is_superadmin;
-  const groups = GROUPS.map((group) => ({ ...group, items: group.items.map((item) => ({
-    ...item,
-    available: item.rules.length > 0 && item.rules.every(([section, resource, action]) => actionsFor(data?.catalog, section, resource).includes(action)),
-  })) }));
-  const isChecked = (item) => item.rules.length > 0 && item.rules.every((entry) => data?.user.is_superadmin || valueFor(permissions, entry) || valueFor(data?.inherited, entry));
-  const selectedCount = groups.flatMap((group) => group.items).filter(isChecked).length;
-  const availableItems = groups.flatMap((group) => group.items).filter((item) => item.available);
-  const allSelected = availableItems.length > 0 && availableItems.every(isChecked);
+  const rules = Object.entries(data?.catalog || {}).flatMap(([section, resources]) =>
+    Object.entries(resources).flatMap(([resource, actions]) => actions.map((action) => [section, resource, action])),
+  );
+  const isChecked = (entry) => Boolean(data?.user.is_superadmin || valueFor(permissions, entry) || valueFor(data?.inherited, entry));
+  const isInherited = (entry) => valueFor(data?.inherited, entry);
+  const selectedCount = rules.filter(isChecked).length;
+  const editableRules = rules.filter((entry) => !isInherited(entry));
+  const allSelected = editableRules.length > 0 && editableRules.every(isChecked);
 
   function updateRules(entries, enabled) {
     setPermissions((current) => {
@@ -204,7 +202,7 @@ export default function UserPermissions({ userId, initialUser, onDone }) {
       setError(new Error("El preset contiene permisos que no están disponibles. Actualiza los presets o selecciona otro."));
       return;
     }
-    setPermissions(enableRequiredViews(next, data.catalog));
+    setPermissions(enableRequiredViews(permissionsForCatalog(next, data.catalog), data.catalog));
     setError(null);
     setNotice(`Preset «${preset.name}» aplicado. Revisa los permisos y pulsa Guardar permisos para confirmarlos.`);
   }
@@ -217,7 +215,7 @@ export default function UserPermissions({ userId, initialUser, onDone }) {
     setNotice("");
     try {
       const user = await accountsApi.savePermissions(userId, permissions);
-      setPermissions(structuredClone(user.permissions || {}));
+      setPermissions(permissionsForCatalog(user.permissions, data.catalog));
       setData((current) => ({ ...current, user, inherited: inheritedPermissions(user) }));
       setNotice("Los permisos se guardaron correctamente.");
     } catch (error) {
@@ -250,37 +248,22 @@ export default function UserPermissions({ userId, initialUser, onDone }) {
           <UserPresetSelector className="order-4 col-span-2 sm:col-span-3 xl:order-3 xl:col-span-1" presets={presets} value={selectedPreset} onChange={setSelectedPreset} onApply={applyPreset} disabled={!editable || busy} loading={presetsLoading} />
           <div className="order-3 col-span-2 flex items-center justify-between gap-2 sm:col-span-1 sm:flex-col sm:items-end xl:order-4 xl:w-60">
             <span className={`inline-block rounded-full px-3 py-1 text-xs font-semibold ${user.is_active ? "bg-[#E8FAF0] text-[#0F8C45]" : "bg-gray-100 text-gray-600"}`}>{user.is_active ? "Activo" : "Inactivo"}</span>
-            <p className="mt-1 text-[13px] font-semibold" aria-live="polite">{selectedCount} de 14 permisos asignados</p>
+            <p className="mt-1 text-[13px] font-semibold" aria-live="polite">{selectedCount} de {rules.length} permisos asignados</p>
           </div>
         </div>
         {presetsError && <div role="status" className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-[#F2F5FA] px-4 py-3 text-xs text-[#6B758A]">
           <p>{presetsError.message} Puedes seguir revisando los permisos individuales.</p>
           {(viewer.is_superadmin || viewer.effective_permissions?.accounts?.presets?.view) && <Button size="small" variant="outline" disabled={busy || presetsLoading} onClick={() => setPresetsRefresh((current) => current + 1)}>Reintentar presets</Button>}
         </div>}
-        <div className="grid gap-3 lg:grid-cols-2">
-          {groups.map((group) => <fieldset key={group.title} className="min-h-[174px] rounded-[10px] border border-[#CCD4E0] bg-white px-3 py-2.5">
-            <legend className="sr-only">{group.title}</legend>
-            <h2 aria-hidden="true" className="mb-1 text-sm leading-6 font-semibold">{group.title}</h2>
-            {group.items.map((item) => {
-              const inherited = item.rules.some((entry) => valueFor(data.inherited, entry));
-              const entirelyInherited = item.rules.length > 0 && item.rules.every((entry) => valueFor(data.inherited, entry));
-              const checked = isChecked(item);
-              const partial = !checked && item.rules.some((entry) => valueFor(permissions, entry) || valueFor(data.inherited, entry));
-              return <label key={item.label} className={`flex min-h-8 items-center gap-2.5 text-[13px] ${!item.available ? "text-[#6B758A]" : ""}`}>
-                <input type="checkbox" className="size-5 shrink-0 rounded accent-[#C8102E] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C8102E]" checked={checked} ref={(element) => { if (element) element.indeterminate = partial; }} disabled={!editable || busy || !item.available || entirelyInherited} onChange={(event) => updateRules(item.rules, event.target.checked)} />
-                <span>{item.label}{!item.available && <span className="ml-1 text-[11px]">(no disponible)</span>}{inherited && <span className="ml-1 text-[11px] text-[#6B758A]">· preset</span>}</span>
-              </label>;
-            })}
-          </fieldset>)}
-        </div>
+        <UserPermissionMatrix catalog={data.catalog} isChecked={isChecked} isInherited={isInherited} disabled={!editable || busy} onChange={(entry, enabled) => updateRules([entry], enabled)} />
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <Button variant="outline" className="!h-[42px] !border-[#C8102E] !text-[#C8102E]" disabled={!editable || busy || !availableItems.length} onClick={() => updateRules(availableItems.flatMap((item) => item.rules).filter((entry) => !valueFor(data.inherited, entry)), !allSelected)}>{allSelected ? "Quitar selección" : "Seleccionar todos"}</Button>
+          <Button variant="outline" className="!h-[42px] !border-[#C8102E] !text-[#C8102E]" disabled={!editable || busy || !editableRules.length} onClick={() => updateRules(editableRules, !allSelected)}>{allSelected ? "Quitar selección" : "Seleccionar todos"}</Button>
           <div className="flex gap-3">
             {onDone ? <Button variant="outline" disabled={busy} onClick={onDone}>Volver a usuarios</Button> : <Button variant="outline" className="!h-[42px] !border-[#C8102E] !text-[#C8102E]" href="/admin/usuarios">Cancelar</Button>}
-            <Button type="submit" className="!h-[42px] !border-[#C8102E] !bg-[#C8102E] hover:!bg-[#A80D27]" disabled={!editable || busy}>{busy ? "Guardando…" : "Guardar permisos"}</Button>
+            <Button type="submit" className="!h-[42px] !border-[#C8102E] !bg-[#C8102E] hover:!bg-[#A80D27]" disabled={!editable || busy || !rules.length}>{busy ? "Guardando…" : "Guardar permisos"}</Button>
           </div>
         </div>
-        <p className="text-xs text-[#6B758A]">Los permisos heredados de presets se conservan. Las opciones no disponibles no están expuestas por el catálogo de la API.</p>
+        <p className="text-xs text-[#6B758A]">Los permisos heredados de presets se conservan. Activar una acción también habilita el acceso de lectura cuando corresponde.</p>
         {!editable && <p className="text-sm text-[#6B758A]">{user.is_superadmin ? "El superadministrador tiene todos los permisos; su acceso no se modifica desde esta vista." : "Tu cuenta puede consultar estos permisos, pero no tiene autorización para modificarlos."}</p>}
       </form>}
       {!data && !loading && <Button href="/admin/usuarios" variant="outline">Volver a usuarios</Button>}
