@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -88,6 +89,9 @@ export default function AdminLoginForm() {
             <LoginField id="confirm-password" label="Confirmar nueva contraseña" type="password" autoComplete="new-password" minLength={12} value={confirmation} onChange={(event) => setConfirmation(event.target.value)} />
           </>}
         </fieldset>
+        {!mustChange && <div className="flex justify-end">
+          <Link href="/admin/recuperar-contrasena" className="text-sm font-medium text-[#C8102E] hover:underline">¿Olvidaste tu contraseña?</Link>
+        </div>}
         <p className="pt-1 text-[13px] text-gray-500">{mustChange ? "Usa al menos 12 caracteres. Evita claves comunes, solo numéricas o similares a tus datos personales." : "Usa tu correo institucional y la contraseña asignada."}</p>
       </CardContent>
       <CardFooter className="pt-2 pb-4">
