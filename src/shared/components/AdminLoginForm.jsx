@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import AccountFeedback from "@/shared/components/AccountFeedback";
 import { useAccountsApi } from "@/shared/components/AccountsProvider";
 
-function LoginField({ id, label, ...props }) {
+export function LoginField({ id, label, ...props }) {
   return <div className="space-y-2 rounded-md border border-gray-200 px-3 py-2 shadow-sm focus-within:border-gray-400 focus-within:ring-1 focus-within:ring-gray-400">
     <Label htmlFor={id} className="text-[11px] font-medium tracking-wider text-gray-500 uppercase">{label}</Label>
     <Input id={id} required className="h-7 border-0 p-0 text-base shadow-none placeholder:text-gray-400 focus-visible:ring-0" {...props} />
