@@ -5,7 +5,8 @@ import AdminTable from "@/shared/components/AdminTable";
 import Badge from "@/shared/components/Badge";
 import Button from "@/shared/components/Button";
 import Notice from "@/shared/components/Notice";
-import { formatDate, pauseHarvest, resumeHarvest } from "@/features/admin/harvesting/harvesting";
+import { formatDate } from "@/features/admin/harvesting/harvesting";
+import { useHarvestingApi } from "./HarvestingProvider";
 
 const STATES = {
   pending: { label: "Pendiente", badge: "info" },
@@ -18,6 +19,7 @@ const STATES = {
 };
 
 export default function HarvestExecutions({ rows, onRefresh, busy = false, caption = "Ejecuciones recientes de cosecha" }) {
+  const { pauseHarvest, resumeHarvest } = useHarvestingApi();
   const [actions, setActions] = useState({});
   const [feedback, setFeedback] = useState(null);
   const requestPending = useRef(new Set());

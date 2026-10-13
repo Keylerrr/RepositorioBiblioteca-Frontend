@@ -6,7 +6,8 @@ import Badge from "@/shared/components/Badge";
 import Button from "@/shared/components/Button";
 import FormField from "@/shared/components/FormField";
 import Notice from "@/shared/components/Notice";
-import { checkPlatformLink, formatDate, getLatestLinkChecks, getLinkChecks, getPlatforms } from "@/features/admin/harvesting/harvesting";
+import { formatDate, getLatestLinkChecks, getLinkChecks, getPlatforms } from "@/features/admin/harvesting/harvesting";
+import { useHarvestingApi } from "./HarvestingProvider";
 
 const PAGE_SIZE = 10;
 
@@ -15,6 +16,7 @@ function httpStatus(row) {
 }
 
 export default function LinkAlerts() {
+  const { checkPlatformLink } = useHarvestingApi();
   const [links, setLinks] = useState([]);
   const [selected, setSelected] = useState([]);
   const [page, setPage] = useState(1);
