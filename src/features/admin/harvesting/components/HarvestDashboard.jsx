@@ -6,8 +6,9 @@ import Button from "@/shared/components/Button";
 import FormField from "@/shared/components/FormField";
 import MetricCard from "@/shared/components/MetricCard";
 import Notice from "@/shared/components/Notice";
-import { deactivateSchedule, formatDate, getHarvests, getHarvestSourceCount, getUpcomingSchedules, runDueSchedules } from "@/features/admin/harvesting/harvesting";
+import { formatDate, getHarvests, getHarvestSourceCount, getUpcomingSchedules } from "@/features/admin/harvesting/harvesting";
 import HarvestExecutions from "./HarvestExecutions";
+import { useHarvestingApi } from "./HarvestingProvider";
 
 const FREQUENCIES = { once: "Única", daily: "Diaria", weekly: "Semanal", monthly: "Mensual" };
 const SCHEDULE_PAGE_SIZE = 10;
@@ -66,6 +67,7 @@ function useHarvestData(loadData, intervalMs = null) {
 }
 
 export default function HarvestDashboard() {
+  const { deactivateSchedule, runDueSchedules } = useHarvestingApi();
   const [page, setPage] = useState(1);
   const [schedulePage, setSchedulePage] = useState(1);
   const [executing, setExecuting] = useState(false);
