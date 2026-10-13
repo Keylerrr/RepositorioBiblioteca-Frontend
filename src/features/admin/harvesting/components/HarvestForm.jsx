@@ -4,9 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import Button from "@/shared/components/Button";
 import FormField from "@/shared/components/FormField";
 import Notice from "@/shared/components/Notice";
-import { buildSchedule, createSchedule, formatDate, getHarvestSources, getPlatforms, IMMEDIATE_HARVEST_ENABLED, MAX_HARVEST_LIMIT, nextBogotaDate, prepareImmediateSchedule } from "@/features/admin/harvesting/harvesting";
+import { buildSchedule, formatDate, getHarvestSources, getPlatforms, IMMEDIATE_HARVEST_ENABLED, MAX_HARVEST_LIMIT, nextBogotaDate } from "@/features/admin/harvesting/harvesting";
 import HarvestSourceOption from "./HarvestSourceOption";
 import HarvestScheduleRuns from "./HarvestScheduleRuns";
+import { useHarvestingApi } from "./HarvestingProvider";
 
 const frequencies = [
   { value: "once", label: "Única vez" },
@@ -19,6 +20,7 @@ const headingClasses = "text-[21px] leading-7 font-semibold min-[541px]:text-2xl
 const radioClasses = "size-[13px] accent-[#A90D27] focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-primary";
 
 export default function HarvestForm() {
+  const { createSchedule, prepareImmediateSchedule } = useHarvestingApi();
   const [sources, setSources] = useState([]);
   const [platformId, setPlatformId] = useState("");
   const [loading, setLoading] = useState(true);
