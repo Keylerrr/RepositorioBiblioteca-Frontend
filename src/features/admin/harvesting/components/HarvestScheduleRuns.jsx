@@ -3,10 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import Button from "@/shared/components/Button";
 import Notice from "@/shared/components/Notice";
-import { getScheduleHarvests, IMMEDIATE_HARVEST_ENABLED, runDueSchedules } from "@/features/admin/harvesting/harvesting";
+import { getScheduleHarvests, IMMEDIATE_HARVEST_ENABLED } from "@/features/admin/harvesting/harvesting";
 import HarvestExecutions from "./HarvestExecutions";
+import { useHarvestingApi } from "./HarvestingProvider";
 
 export default function HarvestScheduleRuns({ scheduleId, revision, busy }) {
+  const { runDueSchedules } = useHarvestingApi();
   const [rows, setRows] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");

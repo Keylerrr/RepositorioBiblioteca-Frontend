@@ -1,4 +1,3 @@
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://repositorio-biblioteca-backend.onrender.com").replace(/\/+$/, "");
 export const MAX_HARVEST_LIMIT = 2147483647;
 export const IMMEDIATE_HARVEST_ENABLED = false;
 
@@ -33,11 +32,20 @@ function errorMessage(payload, status) {
   return `La API respondió con un error (${status}). Intenta nuevamente.`;
 }
 
-async function request(path, { method = "GET", body, signal, timeoutMs = method === "GET" ? 30000 : 90000, expectJson = true } = {}) {
+async function request(path, { method = "GET", body, signal, timeoutMs = 30000, expectJson = true } = {}, mutateAction) {
+  // Session cookies belong to Next.js. Reads use its proxy; mutations use the
+  // Server Action that forwards the session and obtains the backend CSRF token.
+  if (method !== "GET") {
+    const { status, data } = await mutateAction(path, method, body);
+    if (status < 200 || status >= 300) throw new ApiError(errorMessage(data, status), status, data);
+    if (!expectJson) return;
+    if (data === null) throw new Error("La API devolvió una respuesta que no se pudo leer.");
+    return data;
+  }
   const timeoutSignal = timeoutMs === null ? null : AbortSignal.timeout(timeoutMs);
   const signals = [signal, timeoutSignal].filter(Boolean);
   try {
-    const response = await fetch(`${API_URL}${path}`, {
+    const response = await fetch(path, {
       method,
       headers: body === undefined ? { Accept: "application/json" } : {
         Accept: "application/json",
@@ -45,6 +53,7 @@ async function request(path, { method = "GET", body, signal, timeoutMs = method 
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       signal: signals.length ? AbortSignal.any(signals) : undefined,
+      credentials: "include",
       cache: "no-store",
     });
     if (response.ok && !expectJson) return;
@@ -128,23 +137,23 @@ export function getLatestLinkChecks(platforms, logs) {
   }).sort((a, b) => b.fail_count - a.fail_count);
 }
 
-export function checkPlatformLink(platformId, url) {
+function checkPlatformLink(platformId, url, mutateAction) {
   return request(`/api/platforms/${platformId}/check-link/`, {
     method: "POST",
     body: url === undefined ? {} : { url },
-  });
+  }, mutateAction);
 }
 
-export function createSchedule(payload) {
-  return request("/api/harvesting/schedules/", { method: "POST", body: payload });
+function createSchedule(payload, mutateAction) {
+  return request("/api/harvesting/schedules/", { method: "POST", body: payload }, mutateAction);
 }
 
-export function deactivateSchedule(id, explanation) {
+function deactivateSchedule(id, explanation, mutateAction) {
   return request(`/api/harvesting/schedules/${id}/`, {
     method: "DELETE",
     body: { delete_explanation: explanation.trim() },
     expectJson: false,
-  });
+  }, mutateAction);
 }
 
 export function buildImmediateScheduleUpdate(schedule) {
@@ -155,24 +164,36 @@ export function buildImmediateScheduleUpdate(schedule) {
   return { start_date: schedule.created_at };
 }
 
-export function prepareImmediateSchedule(schedule) {
+function prepareImmediateSchedule(schedule, mutateAction) {
   return request(`/api/harvesting/schedules/${schedule.id}/`, {
     method: "PATCH",
     body: buildImmediateScheduleUpdate(schedule),
-  });
+  }, mutateAction);
 }
 
-export function runDueSchedules() {
+function runDueSchedules(mutateAction) {
   // Accept successful responses without a body; execution state comes from GET /harvests/.
-  return request("/api/harvesting/schedules/run-due/", { method: "POST", timeoutMs: null, expectJson: false });
+  return request("/api/harvesting/schedules/run-due/", { method: "POST", expectJson: false }, mutateAction);
 }
 
-export function pauseHarvest(id) {
-  return request(`/api/harvesting/harvests/${id}/pause/`, { method: "POST" });
+function pauseHarvest(id, mutateAction) {
+  return request(`/api/harvesting/harvests/${id}/pause/`, { method: "POST" }, mutateAction);
 }
 
-export function resumeHarvest(id) {
-  return request(`/api/harvesting/harvests/${id}/resume/`, { method: "POST", timeoutMs: null });
+function resumeHarvest(id, mutateAction) {
+  return request(`/api/harvesting/harvests/${id}/resume/`, { method: "POST" }, mutateAction);
+}
+
+export function createHarvestingApi(mutateAction) {
+  return {
+    checkPlatformLink: (id, url) => checkPlatformLink(id, url, mutateAction),
+    createSchedule: (payload) => createSchedule(payload, mutateAction),
+    deactivateSchedule: (id, explanation) => deactivateSchedule(id, explanation, mutateAction),
+    prepareImmediateSchedule: (schedule) => prepareImmediateSchedule(schedule, mutateAction),
+    runDueSchedules: () => runDueSchedules(mutateAction),
+    pauseHarvest: (id) => pauseHarvest(id, mutateAction),
+    resumeHarvest: (id) => resumeHarvest(id, mutateAction),
+  };
 }
 
 export function buildSchedule({ platformId, limit, minutes, mode, startDate, frequency }, now = new Date()) {

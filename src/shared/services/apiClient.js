@@ -157,3 +157,61 @@ export const apiClient = {
     return handleResponse(response);
   },
 };
+
+// Read-only requests use the same-origin proxy. Mutations run through the
+// Server Action supplied by AccountsGateway, which owns session and CSRF cookies.
+async function accountsRequest(path, { method = "GET", body, signal } = {}, mutateAction) {
+  const headers = { Accept: "application/json" };
+  if (method !== "GET") {
+    const result = await mutateAction(path, method, body);
+    if (result.status === 204) return null;
+    return handleResponse(new Response(JSON.stringify(result.data), {
+      status: result.status, headers: { "Content-Type": "application/json" },
+    }));
+  }
+  if (body !== undefined) headers["Content-Type"] = "application/json";
+  let response;
+  try {
+    response = await fetch(`/api/accounts/${path}`, {
+      method, headers, credentials: "include", cache: "no-store", signal,
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    });
+  } catch (error) {
+    if (error.name === "AbortError") throw error;
+    throw new Error("No se pudo conectar con el servidor. Revisa tu conexión e intenta nuevamente.");
+  }
+  if (response.status === 204) return null;
+  return handleResponse(response);
+}
+
+export function hasAccountPermission(user, action) {
+  return Boolean(user?.is_superadmin || user?.effective_permissions?.accounts?.users?.[action]);
+}
+
+// Reads do not depend on the Server Action reference, which can change when
+// Next.js refreshes session cookies. Keep these callbacks stable for effects.
+const accountQueries = {
+  me: (signal) => accountsRequest("auth/me/", { signal }),
+  users: (signal) => accountsRequest("users/", { signal }),
+  user: (id, signal) => accountsRequest(`users/${encodeURIComponent(id)}/`, { signal }),
+  permissions: (signal) => accountsRequest("permissions/", { signal }),
+  presets: (signal) => accountsRequest("presets/", { signal }),
+  preset: (id, signal) => accountsRequest(`presets/${encodeURIComponent(id)}/`, { signal }),
+};
+
+export function createAccountsApi(mutateAction) {
+  const mutate = (path, method, body) => accountsRequest(path, { method, body }, mutateAction);
+  return {
+    ...accountQueries,
+    login: (body) => mutate("auth/login/", "POST", body),
+    logout: () => mutate("auth/logout/", "POST"),
+    changePassword: (body) => mutate("password/change/", "POST", body),
+    invite: (body) => mutate("users/invite/", "POST", body),
+    updateUser: (id, body) => mutate(`users/${encodeURIComponent(id)}/`, "PATCH", body),
+    deactivate: (id) => mutate(`users/${encodeURIComponent(id)}/`, "DELETE"),
+    createPreset: (body) => mutate("presets/", "POST", body),
+    updatePreset: (id, body) => mutate(`presets/${encodeURIComponent(id)}/`, "PATCH", body),
+    deletePreset: (id) => mutate(`presets/${encodeURIComponent(id)}/`, "DELETE"),
+    savePermissions: (id, permissions) => mutate(`users/${encodeURIComponent(id)}/permissions/`, "PUT", { permissions }),
+  };
+}

@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { Suspense, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useAccountsApi } from "@/shared/components/AccountsProvider";
 import { 
   LayoutGrid, 
   Book, 
@@ -20,8 +21,33 @@ import {
 } from "lucide-react";
 
 export default function AdminLayout({ children }) {
+  return <Suspense fallback={<div role="status" className="p-8">Cargando administración…</div>}><AdminLayoutContent>{children}</AdminLayoutContent></Suspense>;
+}
+
+function AdminLayoutContent({ children }) {
+  const accountsApi = useAccountsApi();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const presetsView = ["presets", "crear-preset", "editar-preset"].includes(searchParams.get("vista"));
+  const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const [sessionError, setSessionError] = useState("");
+
+  async function signOut() {
+    if (signingOut) return;
+    setSigningOut(true);
+    setSessionError("");
+    try {
+      await accountsApi.logout();
+      setSidebarOpen(false);
+      router.replace("/admin/login");
+      router.refresh();
+    } catch (error) {
+      setSessionError(error.message);
+      setSigningOut(false);
+    }
+  }
 
   // Mapeo de rutas basado en tu estructura y el diseño
   const menuGroups = [
@@ -41,6 +67,7 @@ export default function AdminLayout({ children }) {
       items: [
         { name: "Bitácora", href: "/admin/bitacora", icon: Clock },
         { name: "Administrativos", href: "/admin/usuarios", icon: Users },
+        { name: "Presets", href: "/admin/usuarios?vista=presets", icon: Users },
         { name: "Papelera", href: "/admin/papelera", icon: Trash2 },
       ]
     },
@@ -103,7 +130,9 @@ export default function AdminLayout({ children }) {
                 {group.items.map((item) => {
                   const Icon = item.icon;
                   // Manejo de estado activo: verifica si la ruta actual empieza con el href del item
-                  const isActive = pathname.startsWith(item.href);
+                  const isActive = item.name === "Presets" ? pathname === "/admin/usuarios" && presetsView
+                    : item.name === "Administrativos" ? pathname.startsWith(item.href) && !presetsView
+                    : pathname.startsWith(item.href);
 
                   return (
                     <Link
@@ -132,7 +161,7 @@ export default function AdminLayout({ children }) {
 
         {/* User Footer - Tarjeta de usuario al estilo del diseño */}
         <div className="p-4 mt-auto">
-          <Link href="/admin/login" onClick={() => setSidebarOpen(false)}>
+          <button type="button" onClick={signOut} disabled={signingOut} className="w-full text-left disabled:opacity-60">
             <div className="flex items-center justify-between p-3 rounded-xl bg-white/10 hover:bg-white/15 transition-colors cursor-pointer group">
               <div className="flex items-center gap-3 overflow-hidden">
                 <div className="w-9 h-9 rounded-full bg-[#EADDD7] text-[#C8102E] font-medium text-sm flex items-center justify-center shrink-0">
@@ -141,13 +170,14 @@ export default function AdminLayout({ children }) {
                 <div className="truncate">
                   <p className="text-sm font-medium text-white truncate">Administrador</p>
                   <p className="text-[11px] text-white/70 group-hover:text-white/90 transition-colors truncate">
-                    Cerrar sesión
+                    {signingOut ? "Cerrando sesión…" : "Cerrar sesión"}
                   </p>
                 </div>
               </div>
               <LogOut className="w-4 h-4 text-white/70 group-hover:text-white transition-colors" />
             </div>
-          </Link>
+          </button>
+          {sessionError && <p role="alert" className="mt-2 text-xs text-white">{sessionError}</p>}
         </div>
       </aside>
 
