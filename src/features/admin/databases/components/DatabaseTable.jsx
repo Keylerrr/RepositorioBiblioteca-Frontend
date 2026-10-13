@@ -6,15 +6,15 @@ import { useRouter } from "next/navigation";
 import { platformService } from "../services/platformService";
 import { capitalizeWords } from "@/lib/utils";
 import DeleteModal from "./DeleteModal";
-import { 
-  Plus, 
-  Search, 
-  CheckCircle, 
-  AlertCircle, 
-  Archive, 
-  Link2, 
-  Trash2, 
-  Eye, 
+import {
+  Plus,
+  Search,
+  CheckCircle,
+  AlertCircle,
+  Archive,
+  Link2,
+  Trash2,
+  Eye,
   Edit3,
   ChevronLeft,
   ChevronRight,
@@ -241,7 +241,7 @@ export default function DatabaseTable() {
         <Link href="/admin/bases-de-datos/nueva">
           <button className="bg-[#C8102E] hover:bg-[#A50D25] text-white font-medium text-sm rounded-lg px-4 py-2.5 flex items-center gap-2 shadow-xs transition-all cursor-pointer">
             <Plus className="w-4 h-4" />
-            <span>+ Nuevo recurso</span>
+            <span>Nuevo recurso</span>
           </button>
         </Link>
       </div>

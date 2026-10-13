@@ -24,6 +24,7 @@ export default function DatabaseForm({ initialData = null, isEdit = false }) {
     languages: [],
     countries: [],
     materialTypes: [],
+    academicPrograms: [],
   });
   const [loadingCatalogs, setLoadingCatalogs] = useState(true);
 
@@ -44,6 +45,7 @@ export default function DatabaseForm({ initialData = null, isEdit = false }) {
     languages: [],
     countries: [],
     material_types: [],
+    academic_programs: [],
   });
 
   const [clearApiKey, setClearApiKey] = useState(false);
@@ -76,6 +78,7 @@ export default function DatabaseForm({ initialData = null, isEdit = false }) {
             languages: extractIds(initialData.languages),
             countries: extractIds(initialData.countries),
             material_types: extractIds(initialData.material_types),
+            academic_programs: extractIds(initialData.academic_programs),
           });
         } else {
           setFormData((prev) => ({
@@ -85,6 +88,8 @@ export default function DatabaseForm({ initialData = null, isEdit = false }) {
             languages: catData.languages.length > 0 ? [catData.languages[0].id] : [1],
             countries: catData.countries.length > 0 ? [catData.countries[0].id] : [1],
             material_types: catData.materialTypes.length > 0 ? [catData.materialTypes[0].id] : [1],
+            academic_programs:
+              catData.academicPrograms.length > 0 ? [catData.academicPrograms[0].id] : [1],
           }));
         }
       } catch (err) {
@@ -178,6 +183,7 @@ export default function DatabaseForm({ initialData = null, isEdit = false }) {
         languages: formData.languages,
         countries: formData.countries,
         material_types: formData.material_types,
+        academic_programs: formData.academic_programs,
       };
 
       // Handle api_key logic:
@@ -449,11 +455,16 @@ export default function DatabaseForm({ initialData = null, isEdit = false }) {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Institución responsable (Multi-Selección) */}
-          <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-2xs space-y-2">
-            <Label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">
-              Institución responsable * (Selección múltiple)
-            </Label>
-            <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+          <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-2xs space-y-2.5">
+            <div className="flex items-center justify-between pb-1 border-b border-gray-100">
+              <Label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">
+                Institución responsable *
+              </Label>
+              <span className="text-[10px] bg-slate-100 text-slate-600 font-semibold px-2 py-0.5 rounded-full">
+                {formData.institutions.length} seleccionados
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 sm:max-h-72 overflow-y-auto pr-1">
               {catalogs.institutions.map((inst) => {
                 const isSelected = formData.institutions.includes(inst.id);
                 const titleName = capitalizeWords(inst.name);
@@ -461,14 +472,14 @@ export default function DatabaseForm({ initialData = null, isEdit = false }) {
                   <div
                     key={inst.id}
                     onClick={() => handleMultiSelectToggle("institutions", inst.id)}
-                    className={`flex items-center justify-between p-2 rounded-lg text-xs cursor-pointer border transition-all ${
+                    className={`flex items-center justify-between p-2.5 rounded-lg text-xs cursor-pointer border transition-all ${
                       isSelected
-                        ? "bg-[#C8102E]/5 border-[#C8102E] text-gray-900 font-semibold"
-                        : "bg-gray-50/50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                        ? "bg-rose-50/70 border-[#C8102E] text-gray-900 font-semibold shadow-2xs"
+                        : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300"
                     }`}
                   >
-                    <span>{titleName}</span>
-                    <div className={`w-4 h-4 rounded flex items-center justify-center border ${isSelected ? "bg-[#C8102E] border-[#C8102E] text-white" : "border-gray-300 bg-white"}`}>
+                    <span className="truncate pr-1">{titleName}</span>
+                    <div className={`w-4 h-4 rounded flex items-center justify-center border transition-all shrink-0 ${isSelected ? "bg-[#C8102E] border-[#C8102E] text-white" : "border-gray-300 bg-white"}`}>
                       {isSelected && <Check className="w-3 h-3" />}
                     </div>
                   </div>
@@ -478,11 +489,16 @@ export default function DatabaseForm({ initialData = null, isEdit = false }) {
           </div>
 
           {/* País (Multi-Selección) */}
-          <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-2xs space-y-2">
-            <Label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">
-              País * (Selección múltiple)
-            </Label>
-            <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+          <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-2xs space-y-2.5">
+            <div className="flex items-center justify-between pb-1 border-b border-gray-100">
+              <Label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">
+                País *
+              </Label>
+              <span className="text-[10px] bg-slate-100 text-slate-600 font-semibold px-2 py-0.5 rounded-full">
+                {formData.countries.length} seleccionados
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 sm:max-h-72 overflow-y-auto pr-1">
               {catalogs.countries.map((country) => {
                 const isSelected = formData.countries.includes(country.id);
                 const titleName = country.emoji_flag 
@@ -492,14 +508,14 @@ export default function DatabaseForm({ initialData = null, isEdit = false }) {
                   <div
                     key={country.id}
                     onClick={() => handleMultiSelectToggle("countries", country.id)}
-                    className={`flex items-center justify-between p-2 rounded-lg text-xs cursor-pointer border transition-all ${
+                    className={`flex items-center justify-between p-2.5 rounded-lg text-xs cursor-pointer border transition-all ${
                       isSelected
-                        ? "bg-[#C8102E]/5 border-[#C8102E] text-gray-900 font-semibold"
-                        : "bg-gray-50/50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                        ? "bg-rose-50/70 border-[#C8102E] text-gray-900 font-semibold shadow-2xs"
+                        : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300"
                     }`}
                   >
-                    <span>{titleName}</span>
-                    <div className={`w-4 h-4 rounded flex items-center justify-center border ${isSelected ? "bg-[#C8102E] border-[#C8102E] text-white" : "border-gray-300 bg-white"}`}>
+                    <span className="truncate pr-1">{titleName}</span>
+                    <div className={`w-4 h-4 rounded flex items-center justify-center border transition-all shrink-0 ${isSelected ? "bg-[#C8102E] border-[#C8102E] text-white" : "border-gray-300 bg-white"}`}>
                       {isSelected && <Check className="w-3 h-3" />}
                     </div>
                   </div>
@@ -509,11 +525,16 @@ export default function DatabaseForm({ initialData = null, isEdit = false }) {
           </div>
 
           {/* Tipo de material (Multi-Selección) */}
-          <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-2xs space-y-2">
-            <Label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">
-              Tipo de material * (Selección múltiple)
-            </Label>
-            <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+          <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-2xs space-y-2.5">
+            <div className="flex items-center justify-between pb-1 border-b border-gray-100">
+              <Label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">
+                Tipo de material *
+              </Label>
+              <span className="text-[10px] bg-slate-100 text-slate-600 font-semibold px-2 py-0.5 rounded-full">
+                {formData.material_types.length} seleccionados
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 sm:max-h-72 overflow-y-auto pr-1">
               {catalogs.materialTypes.map((mat) => {
                 const isSelected = formData.material_types.includes(mat.id);
                 const titleName = capitalizeWords(mat.name);
@@ -521,14 +542,14 @@ export default function DatabaseForm({ initialData = null, isEdit = false }) {
                   <div
                     key={mat.id}
                     onClick={() => handleMultiSelectToggle("material_types", mat.id)}
-                    className={`flex items-center justify-between p-2 rounded-lg text-xs cursor-pointer border transition-all ${
+                    className={`flex items-center justify-between p-2.5 rounded-lg text-xs cursor-pointer border transition-all ${
                       isSelected
-                        ? "bg-[#C8102E]/5 border-[#C8102E] text-gray-900 font-semibold"
-                        : "bg-gray-50/50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                        ? "bg-rose-50/70 border-[#C8102E] text-gray-900 font-semibold shadow-2xs"
+                        : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300"
                     }`}
                   >
-                    <span>{titleName}</span>
-                    <div className={`w-4 h-4 rounded flex items-center justify-center border ${isSelected ? "bg-[#C8102E] border-[#C8102E] text-white" : "border-gray-300 bg-white"}`}>
+                    <span className="truncate pr-1">{titleName}</span>
+                    <div className={`w-4 h-4 rounded flex items-center justify-center border transition-all shrink-0 ${isSelected ? "bg-[#C8102E] border-[#C8102E] text-white" : "border-gray-300 bg-white"}`}>
                       {isSelected && <Check className="w-3 h-3" />}
                     </div>
                   </div>
@@ -538,11 +559,16 @@ export default function DatabaseForm({ initialData = null, isEdit = false }) {
           </div>
 
           {/* Idiomas (Multi-Selección) */}
-          <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-2xs space-y-2">
-            <Label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">
-              Idiomas * (Selección múltiple)
-            </Label>
-            <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+          <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-2xs space-y-2.5">
+            <div className="flex items-center justify-between pb-1 border-b border-gray-100">
+              <Label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">
+                Idiomas *
+              </Label>
+              <span className="text-[10px] bg-slate-100 text-slate-600 font-semibold px-2 py-0.5 rounded-full">
+                {formData.languages.length} seleccionados
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 sm:max-h-72 overflow-y-auto pr-1">
               {catalogs.languages.map((lang) => {
                 const isSelected = formData.languages.includes(lang.id);
                 const titleName = capitalizeWords(lang.name);
@@ -550,14 +576,48 @@ export default function DatabaseForm({ initialData = null, isEdit = false }) {
                   <div
                     key={lang.id}
                     onClick={() => handleMultiSelectToggle("languages", lang.id)}
-                    className={`flex items-center justify-between p-2 rounded-lg text-xs cursor-pointer border transition-all ${
+                    className={`flex items-center justify-between p-2.5 rounded-lg text-xs cursor-pointer border transition-all ${
                       isSelected
-                        ? "bg-[#C8102E]/5 border-[#C8102E] text-gray-900 font-semibold"
-                        : "bg-gray-50/50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                        ? "bg-rose-50/70 border-[#C8102E] text-gray-900 font-semibold shadow-2xs"
+                        : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300"
                     }`}
                   >
-                    <span>{lang.abbreviation ? `${lang.abbreviation.toUpperCase()} - ${titleName}` : titleName}</span>
-                    <div className={`w-4 h-4 rounded flex items-center justify-center border ${isSelected ? "bg-[#C8102E] border-[#C8102E] text-white" : "border-gray-300 bg-white"}`}>
+                    <span className="truncate pr-1">{lang.abbreviation ? `${lang.abbreviation.toUpperCase()} - ${titleName}` : titleName}</span>
+                    <div className={`w-4 h-4 rounded flex items-center justify-center border transition-all shrink-0 ${isSelected ? "bg-[#C8102E] border-[#C8102E] text-white" : "border-gray-300 bg-white"}`}>
+                      {isSelected && <Check className="w-3 h-3" />}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Programas académicos */}
+          <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-2xs space-y-2.5">
+            <div className="flex items-center justify-between pb-1 border-b border-gray-100">
+              <Label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">
+                Programas académicos *
+              </Label>
+              <span className="text-[10px] bg-slate-100 text-slate-600 font-semibold px-2 py-0.5 rounded-full">
+                {formData.academic_programs.length} seleccionados
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 sm:max-h-72 overflow-y-auto pr-1">
+              {catalogs.academicPrograms.map((prog) => {
+                const isSelected = formData.academic_programs.includes(prog.id);
+                const titleName = capitalizeWords(prog.name);
+                return (
+                  <div
+                    key={prog.id}
+                    onClick={() => handleMultiSelectToggle("academic_programs", prog.id)}
+                    className={`flex items-center justify-between p-2.5 rounded-lg text-xs cursor-pointer border transition-all ${
+                      isSelected
+                        ? "bg-rose-50/70 border-[#C8102E] text-gray-900 font-semibold shadow-2xs"
+                        : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300"
+                    }`}
+                  >
+                    <span className="truncate pr-1">{titleName}</span>
+                    <div className={`w-4 h-4 rounded flex items-center justify-center border transition-all shrink-0 ${isSelected ? "bg-[#C8102E] border-[#C8102E] text-white" : "border-gray-300 bg-white"}`}>
                       {isSelected && <Check className="w-3 h-3" />}
                     </div>
                   </div>

@@ -228,7 +228,7 @@ export default function JournalTable() {
           <Link href="/admin/revistas/nueva">
             <button className="bg-[#C8102E] hover:bg-[#A50D25] text-white font-medium text-sm rounded-lg px-4 py-2.5 flex items-center gap-2 shadow-xs transition-all cursor-pointer">
               <Plus className="w-4 h-4" />
-              <span>+ Nueva revista</span>
+              <span>Nueva revista</span>
             </button>
           </Link>
         </div>
