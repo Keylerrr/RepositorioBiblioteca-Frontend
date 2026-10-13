@@ -31,9 +31,48 @@ export const journalService = {
 
   /**
    * Publish journal (POST /api/journals/{id}/publish/)
+   * Payload: { licenses: [1, 2, ...] }
    */
-  publishJournal: async (id) => {
-    return apiClient.post(`/api/journals/${id}/publish/`, {});
+  publishJournal: async (id, licenses = []) => {
+    return apiClient.post(`/api/journals/${id}/publish/`, { licenses });
+  },
+
+  /**
+   * List licenses (GET /api/journals/licenses/)
+   */
+  getLicenses: async (params = {}) => {
+    try {
+      const res = await apiClient.get("/api/journals/licenses/", params);
+      if (Array.isArray(res)) return res;
+      if (res && Array.isArray(res.results)) return res.results;
+      return [];
+    } catch (err) {
+      console.error("Error fetching licenses:", err);
+      throw err;
+    }
+  },
+
+  /**
+   * Create license (POST /api/journals/licenses/)
+   * Payload: { name: "CC BY 4.0" }
+   */
+  createLicense: async (data) => {
+    return apiClient.post("/api/journals/licenses/", data);
+  },
+
+  /**
+   * Partial update of a license (PATCH /api/journals/licenses/{id}/)
+   * Payload: { name: "Nuevo Nombre" }
+   */
+  patchLicense: async (id, data) => {
+    return apiClient.patch(`/api/journals/licenses/${id}/`, data);
+  },
+
+  /**
+   * Delete license (DELETE /api/journals/licenses/{id}/)
+   */
+  deleteLicense: async (id) => {
+    return apiClient.delete(`/api/journals/licenses/${id}/`);
   },
 
   /**

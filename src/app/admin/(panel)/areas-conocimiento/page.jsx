@@ -1,58 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { apiClient } from "@/shared/services/apiClient";
 
 /* ───────────── Cliente del API (todas las rutas terminan en "/") ───────────── */
-const BASE = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/+$/, "");
 const CATALOG = "/api/catalog";
 const RES = { areas: "knowledge-areas", programs: "academic-programs" };
 const MAX_PAGES = 50;
 
-class ApiError extends Error {
-  constructor(status, message) {
-    super(message);
-    this.status = status;
-  }
-}
-
-// DRF responde { campo: ["mensaje"] }, { detail: "..." } o texto plano
-const textOf = (data) =>
-  typeof data === "string"
-    ? data
-    : data && typeof data === "object"
-    ? Object.values(data).flat().filter((v) => typeof v === "string").join(" ")
-    : "";
-
-function errorMessage(data, status) {
-  const text = textOf(data);
-  if (text) return text;
-  if (status === 404) return "El registro no existe o fue eliminado.";
-  if (status >= 500) return "El servidor tuvo un problema. Intenta de nuevo en unos minutos.";
-  return "No se pudo completar la solicitud.";
-}
-
-async function request(path, options = {}) {
-  if (!BASE) throw new ApiError(0, "Falta configurar NEXT_PUBLIC_API_URL.");
-  let res;
-  try {
-    res = await fetch(`${BASE}${path}`, {
-      ...options,
-      headers: { "Content-Type": "application/json", ...options.headers },
-    });
-  } catch {
-    throw new ApiError(0, "No se pudo conectar con el servidor.");
-  }
-  if (res.status === 204) return null;
-  const data = await res.json().catch(() => null);
-  if (!res.ok) throw new ApiError(res.status, errorMessage(data, res.status));
-  return data ?? {};
-}
-
-// Los listados vienen paginados (10 por página): se recorren todas las páginas
 async function listAll(path) {
   const items = [];
   for (let page = 1; page <= MAX_PAGES; page++) {
-    const data = await request(`${path}?ordering=name&page=${page}`);
+    const data = await apiClient.get(path, { ordering: "name", page: String(page) });
     if (Array.isArray(data)) return data;
     items.push(...(data?.results ?? []));
     if (!data?.next) break;
@@ -60,7 +19,6 @@ async function listAll(path) {
   return items;
 }
 
-// El campo puede llegar como [1, 2] o como [{ id: 1, ... }]
 const areaIdsOf = (p) => (p.knowledge_areas ?? []).map((a) => (typeof a === "object" ? a.id : a));
 
 async function fetchCatalog() {
@@ -74,19 +32,25 @@ async function fetchCatalog() {
 }
 
 const createItem = (res, body) =>
-  request(`${CATALOG}/${res}/`, { method: "POST", body: JSON.stringify(body) });
+  apiClient.post(`${CATALOG}/${res}/`, body);
 const updateItem = (res, id, body) =>
-  request(`${CATALOG}/${res}/${id}/`, { method: "PATCH", body: JSON.stringify(body) });
+  apiClient.patch(`${CATALOG}/${res}/${id}/`, body);
 const deleteItem = (res, id, explanation) =>
-  request(`${CATALOG}/${res}/${id}/`, { method: "DELETE", body: JSON.stringify({ delete_explanation: explanation }) });
-const restoreItem = (res, id) => request(`${CATALOG}/${res}/${id}/restore/`, { method: "POST" });
+  apiClient.delete(`${CATALOG}/${res}/${id}/`, { delete_explanation: explanation });
+const restoreItem = (res, id) => apiClient.post(`${CATALOG}/${res}/${id}/restore/`, {});
 
 /* ───────────── Utilidades y estilos ───────────── */
-// El API guarda los nombres en minúsculas y sin espacios en los extremos
 const normalize = (s) => (s ?? "").trim().toLowerCase();
 const label = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 const sameSet = (a, b) => a.length === b.length && a.every((x) => b.includes(x));
-const fmtDate = (d) => (d ? new Date(d).toLocaleDateString("es-CO") : "");
+
+// Formateo determinista para evitar discrepancias de zona horaria entre servidor y cliente
+const fmtDate = (d) => {
+  if (!d) return "";
+  const date = new Date(d);
+  if (isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("es-CO", { timeZone: "UTC" }).format(date);
+};
 
 const focus =
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#c8102e]";
@@ -167,7 +131,6 @@ function Footer({ busy, error, submit, busyLabel, onClose, tone }) {
   );
 }
 
-/* Campo de etiquetas: Enter o coma agregan, Backspace quita la última */
 function TagInput({ id, value, onChange }) {
   const [text, setText] = useState("");
   function add() {
@@ -211,7 +174,6 @@ function TagInput({ id, value, onChange }) {
   );
 }
 
-/* Crear o editar un área / programa */
 function ItemDialog({ kind, item, areas, onClose, onDone }) {
   const isProgram = kind === "programs";
   const [name, setName] = useState(item ? label(item.name) : "");
@@ -278,7 +240,6 @@ function ItemDialog({ kind, item, areas, onClose, onDone }) {
   );
 }
 
-/* Eliminar: el API exige una explicación */
 function DeleteDialog({ kind, item, onClose, onDone }) {
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
@@ -291,7 +252,6 @@ function DeleteDialog({ kind, item, onClose, onDone }) {
     setError("");
     try {
       const data = await deleteItem(RES[kind], item.id, reason.trim());
-      // 204: eliminado del todo. 200: tenía relaciones, quedó desactivado y se puede restaurar
       await onDone(data ? data.detail || data.message || "Tenía relaciones: quedó desactivado y puede restaurarse." : "Eliminado.");
     } catch (err) {
       setError(err.message);
@@ -321,7 +281,6 @@ function DeleteDialog({ kind, item, onClose, onDone }) {
   );
 }
 
-/* Editar correspondencias: programas vinculados a cada área */
 function LinksDrawer({ areas, programs, onClose, onDone }) {
   const [draft, setDraft] = useState(() => areas.map((a) => ({ id: a.id, name: a.name, programas: [...a.rel] })));
   const [busy, setBusy] = useState(false);
@@ -353,7 +312,7 @@ function LinksDrawer({ areas, programs, onClose, onDone }) {
       for (const op of ops) await op();
       await onDone("Correspondencias guardadas.");
     } catch (err) {
-      await onDone(null); // refresca lo que ya se aplicó antes del error
+      await onDone(null);
       setError(err.message);
       setBusy(false);
     }
@@ -384,8 +343,9 @@ function LinksDrawer({ areas, programs, onClose, onDone }) {
 
 /* ───────────── Página ───────────── */
 export default function Page() {
+  const [mounted, setMounted] = useState(false);
   const [data, setData] = useState({ areas: [], programs: [], areasDel: [], programsDel: [] });
-  const [status, setStatus] = useState("loading"); // loading | ready | error
+  const [status, setStatus] = useState("loading");
   const [loadError, setLoadError] = useState("");
 
   const [tab, setTab] = useState("areas");
@@ -394,8 +354,12 @@ export default function Page() {
   const [showArchived, setShowArchived] = useState(false);
   const [desc, setDesc] = useState(false);
 
-  const [dialog, setDialog] = useState(null); // { type: "item" | "delete" | "links", kind?, item? }
+  const [dialog, setDialog] = useState(null);
   const [toast, setToast] = useState("");
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const load = useCallback(async ({ silent = false } = {}) => {
     if (!silent) setStatus("loading");
@@ -440,7 +404,6 @@ export default function Page() {
     }
   }
 
-  // Vistas con sus relaciones ya resueltas
   const areasView = useMemo(
     () =>
       data.areas.map((a) => ({
@@ -486,7 +449,8 @@ export default function Page() {
     )
     .sort((a, b) => a.name.localeCompare(b.name, "es") * (desc ? -1 : 1));
 
-  const ready = status === "ready";
+  // ready depende de que el componente ya esté montado en el cliente
+  const ready = Boolean(mounted && status === "ready");
   const sinProgramas = areasView.filter((a) => a.rel.length === 0).length;
   const archivedCount = (tab === "areas" ? data.areasDel : data.programsDel).length;
   const hasFilters = search || onlyEmpty;
@@ -507,11 +471,23 @@ export default function Page() {
           </div>
           <div className="flex flex-wrap gap-3">
             {tab === "areas" && (
-              <button type="button" disabled={!ready} onClick={() => setDialog({ type: "links" })} className={secondary}>
+              <button
+                type="button"
+                disabled={Boolean(!ready)}
+                suppressHydrationWarning
+                onClick={() => setDialog({ type: "links" })}
+                className={secondary}
+              >
                 Editar correspondencias
               </button>
             )}
-            <button type="button" disabled={!ready} onClick={() => setDialog({ type: "item", kind: tab })} className={primary}>
+            <button
+              type="button"
+              disabled={Boolean(!ready)}
+              suppressHydrationWarning
+              onClick={() => setDialog({ type: "item", kind: tab })}
+              className={primary}
+            >
               {text.create}
             </button>
           </div>
@@ -573,7 +549,8 @@ export default function Page() {
           <button
             type="button"
             aria-pressed={showArchived}
-            disabled={!ready}
+            disabled={Boolean(!ready)}
+            suppressHydrationWarning
             onClick={() => setShowArchived((v) => !v)}
             className={`rounded-full border px-4 py-1.5 text-sm font-medium disabled:opacity-50 ${focus} ${
               showArchived ? "border-slate-700 bg-slate-800 text-white" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
@@ -585,7 +562,8 @@ export default function Page() {
             <button
               type="button"
               aria-pressed={onlyEmpty}
-              disabled={!ready}
+              disabled={Boolean(!ready)}
+              suppressHydrationWarning
               onClick={() => setOnlyEmpty((v) => !v)}
               className={`rounded-full border px-4 py-1.5 text-sm font-medium disabled:opacity-50 ${focus} ${
                 onlyEmpty ? "border-amber-400 bg-amber-50 text-amber-900" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
@@ -626,7 +604,7 @@ export default function Page() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {status === "loading" && (
+              {(!mounted || status === "loading") && (
                 <tr>
                   <td colSpan={3} className="px-5 py-10 text-center text-slate-600" aria-live="polite">
                     <p>Cargando áreas y programas…</p>

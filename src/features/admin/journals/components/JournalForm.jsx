@@ -7,7 +7,16 @@ import { capitalizeWords } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, AlertCircle, Info, Check, Plus, Trash2 } from "lucide-react";
+import {
+  ArrowLeft,
+  AlertCircle,
+  Info,
+  Check,
+  Plus,
+  Trash2,
+  Globe,
+  ExternalLink,
+} from "lucide-react";
 
 function extractIds(list) {
   if (!list || !Array.isArray(list) || list.length === 0) return [];
@@ -57,10 +66,8 @@ export default function JournalForm({ initialData = null, isEdit = false }) {
   const [formData, setFormData] = useState({
     title: "",
     issn: "",
+    publication_date: "",
     url_image: "",
-    license: "",
-    start_period: "",
-    finish_period: "",
     has_apc: false,
     languages: [],
     countries: [],
@@ -85,10 +92,8 @@ export default function JournalForm({ initialData = null, isEdit = false }) {
           setFormData({
             title: initialData.title || "",
             issn: initialData.issn || "",
+            publication_date: String(initialData.publication_date || "").slice(0, 10),
             url_image: initialData.url_image || "",
-            license: initialData.license || "",
-            start_period: String(initialData.start_period || "").slice(0, 10),
-            finish_period: String(initialData.finish_period || "").slice(0, 10),
             has_apc: Boolean(initialData.has_apc),
             languages: extractIds(initialData.languages),
             countries: extractIds(initialData.countries),
@@ -97,7 +102,8 @@ export default function JournalForm({ initialData = null, isEdit = false }) {
             editorial: extractSingleId(initialData.editorial),
             platforms: (initialData.platforms || []).map((p, index) => ({
               _key: `existing-${p.id ?? index}`,
-              platform: typeof p.platform === "object" && p.platform !== null ? p.platform.id : p.platform,
+              platform:
+                typeof p.platform === "object" && p.platform !== null ? p.platform.id : p.platform,
               journal_url: p.journal_url || "",
               start_period: String(p.start_period || "").slice(0, 10),
               finish_period: String(p.finish_period || "").slice(0, 10),
@@ -113,6 +119,7 @@ export default function JournalForm({ initialData = null, isEdit = false }) {
             academic_programs:
               catData.academicPrograms.length > 0 ? [catData.academicPrograms[0].id] : [],
             editorial: catData.editorials[0]?.id || "",
+            platforms: [emptyPlatformRow()],
           }));
         }
       } catch (err) {
@@ -177,9 +184,9 @@ export default function JournalForm({ initialData = null, isEdit = false }) {
       return;
     }
 
-    if (!formData.start_period) {
-      setFormError("El periodo de inicio es obligatorio.");
-      setFieldErrors({ start_period: "El periodo de inicio es requerido." });
+    if (!formData.publication_date) {
+      setFormError("La fecha de publicación u origen es obligatoria.");
+      setFieldErrors({ publication_date: "La fecha de publicación es requerida." });
       return;
     }
 
@@ -189,21 +196,28 @@ export default function JournalForm({ initialData = null, isEdit = false }) {
       return;
     }
 
+    // Al crear una revista nueva, se exige al menos una plataforma vinculada
+    if (!isEdit && formData.platforms.length === 0) {
+      setFormError("Debe vincular al menos una plataforma a la revista.");
+      setFieldErrors({
+        platforms: "La selección de al menos una plataforma es obligatoria al crear una revista.",
+      });
+      return;
+    }
+
+    // Validar cada plataforma vinculada
     for (let i = 0; i < formData.platforms.length; i++) {
       const row = formData.platforms[i];
       if (!row.platform) {
-        setFormError(`La plataforma #${i + 1} es obligatoria.`);
+        setFormError(`La plataforma en la fila #${i + 1} es obligatoria.`);
         setFieldErrors({ platforms: `Seleccione una plataforma en la fila ${i + 1}.` });
         return;
       }
-      if (!row.journal_url.trim()) {
+      if (!row.journal_url || !row.journal_url.trim()) {
         setFormError(`La URL de la revista en la plataforma #${i + 1} es obligatoria.`);
-        setFieldErrors({ platforms: `La URL de la revista es requerida en la fila ${i + 1}.` });
-        return;
-      }
-      if (!row.start_period) {
-        setFormError(`El periodo de inicio de la plataforma #${i + 1} es obligatorio.`);
-        setFieldErrors({ platforms: `El periodo de inicio es requerido en la fila ${i + 1}.` });
+        setFieldErrors({
+          platforms: `La URL específica de la revista es requerida en la fila ${i + 1}.`,
+        });
         return;
       }
     }
@@ -214,10 +228,8 @@ export default function JournalForm({ initialData = null, isEdit = false }) {
       const payload = {
         title: formData.title.trim(),
         issn: formData.issn.trim(),
+        publication_date: formData.publication_date,
         url_image: formData.url_image ? formData.url_image.trim() : null,
-        license: formData.license ? formData.license.trim() : null,
-        start_period: formData.start_period,
-        finish_period: formData.finish_period || null,
         has_apc: Boolean(formData.has_apc),
         languages: formData.languages,
         countries: formData.countries,
@@ -227,7 +239,7 @@ export default function JournalForm({ initialData = null, isEdit = false }) {
         platforms: formData.platforms.map((row) => ({
           platform: Number(row.platform),
           journal_url: row.journal_url.trim(),
-          start_period: row.start_period,
+          start_period: row.start_period || null,
           finish_period: row.finish_period || null,
           has_full_text: Boolean(row.has_full_text),
         })),
@@ -308,6 +320,7 @@ export default function JournalForm({ initialData = null, isEdit = false }) {
         </div>
       )}
 
+      {/* SECCIÓN 1: Identificación */}
       <div className="space-y-3">
         <h2 className="text-sm font-bold text-gray-900">Identificación</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -347,33 +360,26 @@ export default function JournalForm({ initialData = null, isEdit = false }) {
             {renderFieldError("issn")}
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-2xs space-y-1 md:col-span-2">
-            <Label htmlFor="url_image" className="text-[11px] font-medium text-gray-500 uppercase block">
-              URL de imagen (opcional)
-            </Label>
-            <Input
-              id="url_image"
-              type="url"
-              value={formData.url_image}
-              onChange={(e) => setFormData({ ...formData, url_image: e.target.value })}
-              placeholder="https://.../logo.png"
-              className="border-0 p-0 text-xs shadow-none focus-visible:ring-0 h-6 text-gray-800"
-            />
-            {renderFieldError("url_image")}
-          </div>
-
           <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-2xs space-y-1">
-            <Label htmlFor="license" className="text-[11px] font-medium text-gray-500 uppercase block">
-              Licencia (opcional)
+            <Label
+              htmlFor="publication_date"
+              className="text-[11px] font-medium text-gray-500 uppercase block"
+            >
+              Fecha de publicación *
             </Label>
             <Input
-              id="license"
-              value={formData.license}
-              onChange={(e) => setFormData({ ...formData, license: e.target.value })}
-              placeholder="Ej. CC BY-NC 4.0"
-              className="border-0 p-0 text-xs shadow-none focus-visible:ring-0 h-6 text-gray-800"
+              id="publication_date"
+              type="date"
+              required
+              value={formData.publication_date}
+              onChange={(e) => {
+                setFormData({ ...formData, publication_date: e.target.value });
+                if (fieldErrors.publication_date)
+                  setFieldErrors((prev) => ({ ...prev, publication_date: null }));
+              }}
+              className="border-0 p-0 text-xs shadow-none focus-visible:ring-0 h-6 text-gray-900 font-medium"
             />
-            {renderFieldError("license")}
+            {renderFieldError("publication_date")}
           </div>
 
           <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-2xs space-y-1">
@@ -393,56 +399,49 @@ export default function JournalForm({ initialData = null, isEdit = false }) {
           </div>
 
           <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-2xs space-y-1">
-            <Label htmlFor="start_period" className="text-[11px] font-medium text-gray-500 uppercase block">
-              Periodo inicio *
+            <Label
+              htmlFor="url_image"
+              className="text-[11px] font-medium text-gray-500 uppercase block"
+            >
+              URL de imagen (opcional)
             </Label>
             <Input
-              id="start_period"
-              type="date"
-              required
-              value={formData.start_period}
-              onChange={(e) => {
-                setFormData({ ...formData, start_period: e.target.value });
-                if (fieldErrors.start_period) setFieldErrors((prev) => ({ ...prev, start_period: null }));
-              }}
-              className="border-0 p-0 text-xs shadow-none focus-visible:ring-0 h-6 text-gray-900 font-medium"
+              id="url_image"
+              type="url"
+              value={formData.url_image}
+              onChange={(e) => setFormData({ ...formData, url_image: e.target.value })}
+              placeholder="https://.../portada.png"
+              className="border-0 p-0 text-xs shadow-none focus-visible:ring-0 h-6 text-gray-800"
             />
-            {renderFieldError("start_period")}
-          </div>
-
-          <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-2xs space-y-1">
-            <Label htmlFor="finish_period" className="text-[11px] font-medium text-gray-500 uppercase block">
-              Periodo fin (opcional)
-            </Label>
-            <Input
-              id="finish_period"
-              type="date"
-              value={formData.finish_period}
-              onChange={(e) => setFormData({ ...formData, finish_period: e.target.value })}
-              className="border-0 p-0 text-xs shadow-none focus-visible:ring-0 h-6 text-gray-900 font-medium"
-            />
-            {renderFieldError("finish_period")}
+            {renderFieldError("url_image")}
           </div>
         </div>
       </div>
 
+      {/* SECCIÓN 2: Cobertura y Clasificación (Rediseño visual responsivo) */}
       <div className="space-y-3 pt-2">
         <h2 className="text-sm font-bold text-gray-900">Cobertura y Clasificación</h2>
 
         <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center gap-2 text-xs text-slate-700">
           <Info className="w-4 h-4 text-slate-500 shrink-0" />
           <span>
-            <strong>Cobertura temática (Áreas de conocimiento):</strong> Se calculará automáticamente al
-            guardar a partir de los programas académicos seleccionados.
+            <strong>Cobertura temática (Áreas de conocimiento):</strong> Se derivará automáticamente a
+            partir de los programas académicos asociados.
           </span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-2xs space-y-2">
-            <Label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">
-              Idiomas * (Selección múltiple)
-            </Label>
-            <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+          {/* Idiomas */}
+          <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-2xs space-y-2.5">
+            <div className="flex items-center justify-between pb-1 border-b border-gray-100">
+              <Label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">
+                Idiomas *
+              </Label>
+              <span className="text-[10px] bg-slate-100 text-slate-600 font-semibold px-2 py-0.5 rounded-full">
+                {formData.languages.length} seleccionados
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 sm:max-h-72 overflow-y-auto pr-1">
               {catalogs.languages.map((lang) => {
                 const isSelected = formData.languages.includes(lang.id);
                 const titleName = capitalizeWords(lang.name);
@@ -450,18 +449,22 @@ export default function JournalForm({ initialData = null, isEdit = false }) {
                   <div
                     key={lang.id}
                     onClick={() => handleMultiSelectToggle("languages", lang.id)}
-                    className={`flex items-center justify-between p-2 rounded-lg text-xs cursor-pointer border transition-all ${
+                    className={`flex items-center justify-between p-2.5 rounded-lg text-xs cursor-pointer border transition-all ${
                       isSelected
-                        ? "bg-[#C8102E]/5 border-[#C8102E] text-gray-900 font-semibold"
-                        : "bg-gray-50/50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                        ? "bg-rose-50/70 border-[#C8102E] text-gray-900 font-semibold shadow-2xs"
+                        : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300"
                     }`}
                   >
-                    <span>
-                      {lang.abbreviation ? `${lang.abbreviation.toUpperCase()} - ${titleName}` : titleName}
+                    <span className="truncate pr-1">
+                      {lang.abbreviation
+                        ? `${lang.abbreviation.toUpperCase()} - ${titleName}`
+                        : titleName}
                     </span>
                     <div
-                      className={`w-4 h-4 rounded flex items-center justify-center border ${
-                        isSelected ? "bg-[#C8102E] border-[#C8102E] text-white" : "border-gray-300 bg-white"
+                      className={`w-4 h-4 rounded flex items-center justify-center border transition-all shrink-0 ${
+                        isSelected
+                          ? "bg-[#C8102E] border-[#C8102E] text-white"
+                          : "border-gray-300 bg-white"
                       }`}
                     >
                       {isSelected && <Check className="w-3 h-3" />}
@@ -473,11 +476,17 @@ export default function JournalForm({ initialData = null, isEdit = false }) {
             {renderFieldError("languages")}
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-2xs space-y-2">
-            <Label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">
-              País * (Selección múltiple)
-            </Label>
-            <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+          {/* Países */}
+          <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-2xs space-y-2.5">
+            <div className="flex items-center justify-between pb-1 border-b border-gray-100">
+              <Label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">
+                País *
+              </Label>
+              <span className="text-[10px] bg-slate-100 text-slate-600 font-semibold px-2 py-0.5 rounded-full">
+                {formData.countries.length} seleccionados
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 sm:max-h-72 overflow-y-auto pr-1">
               {catalogs.countries.map((country) => {
                 const isSelected = formData.countries.includes(country.id);
                 const titleName = country.emoji_flag
@@ -487,16 +496,18 @@ export default function JournalForm({ initialData = null, isEdit = false }) {
                   <div
                     key={country.id}
                     onClick={() => handleMultiSelectToggle("countries", country.id)}
-                    className={`flex items-center justify-between p-2 rounded-lg text-xs cursor-pointer border transition-all ${
+                    className={`flex items-center justify-between p-2.5 rounded-lg text-xs cursor-pointer border transition-all ${
                       isSelected
-                        ? "bg-[#C8102E]/5 border-[#C8102E] text-gray-900 font-semibold"
-                        : "bg-gray-50/50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                        ? "bg-rose-50/70 border-[#C8102E] text-gray-900 font-semibold shadow-2xs"
+                        : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300"
                     }`}
                   >
-                    <span>{titleName}</span>
+                    <span className="truncate pr-1">{titleName}</span>
                     <div
-                      className={`w-4 h-4 rounded flex items-center justify-center border ${
-                        isSelected ? "bg-[#C8102E] border-[#C8102E] text-white" : "border-gray-300 bg-white"
+                      className={`w-4 h-4 rounded flex items-center justify-center border transition-all shrink-0 ${
+                        isSelected
+                          ? "bg-[#C8102E] border-[#C8102E] text-white"
+                          : "border-gray-300 bg-white"
                       }`}
                     >
                       {isSelected && <Check className="w-3 h-3" />}
@@ -508,11 +519,17 @@ export default function JournalForm({ initialData = null, isEdit = false }) {
             {renderFieldError("countries")}
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-2xs space-y-2">
-            <Label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">
-              Tipo de material * (Selección múltiple)
-            </Label>
-            <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+          {/* Tipos de material */}
+          <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-2xs space-y-2.5">
+            <div className="flex items-center justify-between pb-1 border-b border-gray-100">
+              <Label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">
+                Tipo de material *
+              </Label>
+              <span className="text-[10px] bg-slate-100 text-slate-600 font-semibold px-2 py-0.5 rounded-full">
+                {formData.material_types.length} seleccionados
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 sm:max-h-72 overflow-y-auto pr-1">
               {catalogs.materialTypes.map((mat) => {
                 const isSelected = formData.material_types.includes(mat.id);
                 const titleName = capitalizeWords(mat.name);
@@ -520,16 +537,18 @@ export default function JournalForm({ initialData = null, isEdit = false }) {
                   <div
                     key={mat.id}
                     onClick={() => handleMultiSelectToggle("material_types", mat.id)}
-                    className={`flex items-center justify-between p-2 rounded-lg text-xs cursor-pointer border transition-all ${
+                    className={`flex items-center justify-between p-2.5 rounded-lg text-xs cursor-pointer border transition-all ${
                       isSelected
-                        ? "bg-[#C8102E]/5 border-[#C8102E] text-gray-900 font-semibold"
-                        : "bg-gray-50/50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                        ? "bg-rose-50/70 border-[#C8102E] text-gray-900 font-semibold shadow-2xs"
+                        : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300"
                     }`}
                   >
-                    <span>{titleName}</span>
+                    <span className="truncate pr-1">{titleName}</span>
                     <div
-                      className={`w-4 h-4 rounded flex items-center justify-center border ${
-                        isSelected ? "bg-[#C8102E] border-[#C8102E] text-white" : "border-gray-300 bg-white"
+                      className={`w-4 h-4 rounded flex items-center justify-center border transition-all shrink-0 ${
+                        isSelected
+                          ? "bg-[#C8102E] border-[#C8102E] text-white"
+                          : "border-gray-300 bg-white"
                       }`}
                     >
                       {isSelected && <Check className="w-3 h-3" />}
@@ -541,11 +560,17 @@ export default function JournalForm({ initialData = null, isEdit = false }) {
             {renderFieldError("material_types")}
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-2xs space-y-2">
-            <Label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">
-              Programas académicos * (Selección múltiple)
-            </Label>
-            <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+          {/* Programas académicos */}
+          <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-2xs space-y-2.5">
+            <div className="flex items-center justify-between pb-1 border-b border-gray-100">
+              <Label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">
+                Programas académicos *
+              </Label>
+              <span className="text-[10px] bg-slate-100 text-slate-600 font-semibold px-2 py-0.5 rounded-full">
+                {formData.academic_programs.length} seleccionados
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 sm:max-h-72 overflow-y-auto pr-1">
               {catalogs.academicPrograms.map((prog) => {
                 const isSelected = formData.academic_programs.includes(prog.id);
                 const titleName = capitalizeWords(prog.name);
@@ -553,16 +578,18 @@ export default function JournalForm({ initialData = null, isEdit = false }) {
                   <div
                     key={prog.id}
                     onClick={() => handleMultiSelectToggle("academic_programs", prog.id)}
-                    className={`flex items-center justify-between p-2 rounded-lg text-xs cursor-pointer border transition-all ${
+                    className={`flex items-center justify-between p-2.5 rounded-lg text-xs cursor-pointer border transition-all ${
                       isSelected
-                        ? "bg-[#C8102E]/5 border-[#C8102E] text-gray-900 font-semibold"
-                        : "bg-gray-50/50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                        ? "bg-rose-50/70 border-[#C8102E] text-gray-900 font-semibold shadow-2xs"
+                        : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300"
                     }`}
                   >
-                    <span>{titleName}</span>
+                    <span className="truncate pr-1">{titleName}</span>
                     <div
-                      className={`w-4 h-4 rounded flex items-center justify-center border ${
-                        isSelected ? "bg-[#C8102E] border-[#C8102E] text-white" : "border-gray-300 bg-white"
+                      className={`w-4 h-4 rounded flex items-center justify-center border transition-all shrink-0 ${
+                        isSelected
+                          ? "bg-[#C8102E] border-[#C8102E] text-white"
+                          : "border-gray-300 bg-white"
                       }`}
                     >
                       {isSelected && <Check className="w-3 h-3" />}
@@ -574,8 +601,12 @@ export default function JournalForm({ initialData = null, isEdit = false }) {
             {renderFieldError("academic_programs")}
           </div>
 
+          {/* Editorial */}
           <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-2xs space-y-1 md:col-span-2">
-            <Label htmlFor="editorial" className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">
+            <Label
+              htmlFor="editorial"
+              className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block"
+            >
               Editorial *
             </Label>
             <select
@@ -599,9 +630,15 @@ export default function JournalForm({ initialData = null, isEdit = false }) {
         </div>
       </div>
 
+      {/* SECCIÓN 3: Indexación / Bases de datos */}
       <div className="space-y-3 pt-2">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-sm font-bold text-gray-900">Indexación / Bases de datos</h2>
+          <div>
+            <h2 className="text-sm font-bold text-gray-900">Indexación / Bases de datos</h2>
+            <p className="text-[11px] text-gray-400 mt-0.5">
+              {!isEdit && "Obligatorio asociar al menos una plataforma publicada al crear la revista."}
+            </p>
+          </div>
           <Button
             type="button"
             variant="outline"
@@ -613,114 +650,158 @@ export default function JournalForm({ initialData = null, isEdit = false }) {
           </Button>
         </div>
 
-        <p className="text-[11px] text-gray-400">
-          Solo se pueden asociar plataformas en estado publicado.
-        </p>
-
         {renderFieldError("platforms")}
 
         {formData.platforms.length === 0 ? (
-          <div className="p-6 rounded-xl bg-slate-50 border border-slate-200/80 text-center text-xs text-slate-500">
-            No hay plataformas asociadas. Use “Añadir Plataforma” para indexar esta revista.
+          <div className="p-6 rounded-xl bg-slate-50 border border-slate-200/80 text-center text-xs text-slate-500 space-y-2">
+            <p>No hay plataformas vinculadas.</p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={addPlatformRow}
+              className="text-xs border-[#C8102E] text-[#C8102E] hover:bg-[#C8102E]/5 cursor-pointer"
+            >
+              + Vincular primera plataforma
+            </Button>
           </div>
         ) : (
           <div>
-            {formData.platforms.map((row, index) => (
-              <div
-                key={row._key}
-                className="bg-white border-2 border-slate-200 rounded-xl p-5 mb-4 shadow-sm relative"
-              >
-                <div className="flex items-center justify-between pr-12 mb-4">
-                  <span className="text-xs font-bold text-slate-700 uppercase tracking-wide">
-                    Plataforma #{index + 1}
-                  </span>
-                </div>
+            {formData.platforms.map((row, index) => {
+              const selectedPlatform = catalogs.publishedPlatforms.find(
+                (p) => String(p.id) === String(row.platform)
+              );
 
-                <button
-                  type="button"
-                  onClick={() => removePlatformRow(index)}
-                  className="absolute top-4 right-4 p-1.5 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-600 hover:text-white hover:border-rose-600 transition-all cursor-pointer"
-                  title="Eliminar esta plataforma"
+              return (
+                <div
+                  key={row._key}
+                  className="bg-white border-2 border-slate-200 rounded-xl p-5 mb-4 shadow-xs relative"
                 >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-bold text-slate-700 uppercase tracking-wide block">
-                      Plataforma *
-                    </Label>
-                    <select
-                      value={row.platform ?? ""}
-                      onChange={(e) => updatePlatformRow(index, { platform: e.target.value })}
-                      className={`${platformFieldClass} cursor-pointer`}
-                    >
-                      <option value="">Seleccione una plataforma publicada ▾</option>
-                      {catalogs.publishedPlatforms.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {capitalizeWords(p.name)}
-                        </option>
-                      ))}
-                    </select>
+                  <div className="flex items-center justify-between pr-12 mb-4">
+                    <span className="text-xs font-bold text-slate-700 uppercase tracking-wide">
+                      Plataforma #{index + 1}
+                    </span>
                   </div>
 
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-bold text-slate-700 uppercase tracking-wide block">
-                      URL de la revista *
-                    </Label>
-                    <Input
-                      type="url"
-                      value={row.journal_url}
-                      onChange={(e) => updatePlatformRow(index, { journal_url: e.target.value })}
-                      placeholder="https://..."
-                      className={platformFieldClass}
-                    />
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removePlatformRow(index)}
+                    className="absolute top-4 right-4 p-1.5 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-600 hover:text-white hover:border-rose-600 transition-all cursor-pointer"
+                    title="Eliminar esta plataforma"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
 
-                  <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Selector de plataforma */}
                     <div className="space-y-1.5">
                       <Label className="text-xs font-bold text-slate-700 uppercase tracking-wide block">
-                        Periodo inicio *
+                        Plataforma *
+                      </Label>
+                      <select
+                        value={row.platform ?? ""}
+                        onChange={(e) => updatePlatformRow(index, { platform: e.target.value })}
+                        className={`${platformFieldClass} cursor-pointer`}
+                      >
+                        <option value="">Seleccione una plataforma publicada ▾</option>
+                        {catalogs.publishedPlatforms.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {capitalizeWords(p.name)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* URL de la revista en la plataforma (obligatorio) */}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-bold text-slate-700 uppercase tracking-wide block">
+                        URL de la revista en esta plataforma *
                       </Label>
                       <Input
-                        type="date"
-                        value={row.start_period || ""}
-                        onChange={(e) => updatePlatformRow(index, { start_period: e.target.value })}
+                        type="url"
+                        required
+                        value={row.journal_url}
+                        onChange={(e) => updatePlatformRow(index, { journal_url: e.target.value })}
+                        placeholder="https://plataforma.org/revistas/mi-revista"
                         className={platformFieldClass}
                       />
                     </div>
 
-                    <div className="space-y-1.5">
-                      <Label className="text-xs font-bold text-slate-700 uppercase tracking-wide block">
-                        Periodo fin (opcional)
-                      </Label>
-                      <Input
-                        type="date"
-                        value={row.finish_period || ""}
-                        onChange={(e) => updatePlatformRow(index, { finish_period: e.target.value })}
-                        className={platformFieldClass}
-                      />
-                    </div>
-                  </div>
+                    {/* URL pública de la plataforma (solo lectura) */}
+                    {selectedPlatform?.public_url && (
+                      <div className="md:col-span-2 p-2.5 rounded-lg bg-blue-50/70 border border-blue-200/80 flex items-center justify-between gap-2 text-xs">
+                        <div className="flex items-center gap-2 text-blue-900 truncate">
+                          <Globe className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                          <span className="font-semibold text-blue-800 shrink-0">
+                            URL pública (plataforma):
+                          </span>
+                          <span className="font-mono text-blue-700 truncate">
+                            {selectedPlatform.public_url}
+                          </span>
+                        </div>
+                        <a
+                          href={selectedPlatform.public_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-blue-600 hover:text-blue-800 shrink-0 flex items-center gap-1 font-medium hover:underline cursor-pointer"
+                        >
+                          <span>Visitar</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      </div>
+                    )}
 
-                  <div className="space-y-1.5 md:col-span-2">
-                    <Label className="text-xs font-bold text-slate-700 uppercase tracking-wide block">
-                      ¿Texto completo?
-                    </Label>
-                    <select
-                      value={row.has_full_text ? "true" : "false"}
-                      onChange={(e) =>
-                        updatePlatformRow(index, { has_full_text: e.target.value === "true" })
-                      }
-                      className={`${platformFieldClass} cursor-pointer`}
-                    >
-                      <option value="true">Sí</option>
-                      <option value="false">No</option>
-                    </select>
+                    {/* Cobertura en la plataforma */}
+                    <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-bold text-slate-700 uppercase tracking-wide block">
+                          Periodo inicio (opcional)
+                        </Label>
+                        <Input
+                          type="date"
+                          value={row.start_period || ""}
+                          onChange={(e) =>
+                            updatePlatformRow(index, { start_period: e.target.value })
+                          }
+                          className={platformFieldClass}
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-bold text-slate-700 uppercase tracking-wide block">
+                          Periodo fin (opcional)
+                        </Label>
+                        <Input
+                          type="date"
+                          value={row.finish_period || ""}
+                          onChange={(e) =>
+                            updatePlatformRow(index, { finish_period: e.target.value })
+                          }
+                          className={platformFieldClass}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Texto completo */}
+                    <div className="space-y-1.5 md:col-span-2">
+                      <Label className="text-xs font-bold text-slate-700 uppercase tracking-wide block">
+                        ¿Texto completo?
+                      </Label>
+                      <select
+                        value={row.has_full_text ? "true" : "false"}
+                        onChange={(e) =>
+                          updatePlatformRow(index, { has_full_text: e.target.value === "true" })
+                        }
+                        className={`${platformFieldClass} cursor-pointer`}
+                      >
+                        <option value="true">Sí</option>
+                        <option value="false">No</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

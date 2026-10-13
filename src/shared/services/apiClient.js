@@ -1,7 +1,21 @@
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "https://repositorio-biblioteca-backend.onrender.com").replace(/\/+$/, "");
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+
+const isBrowser = typeof window !== "undefined";
 
 /**
- * Helper to build full URL with query parameters
+ * Read csrftoken from document.cookie (browser-only).
+ */
+function getCsrfToken() {
+  if (!isBrowser) return null;
+  const match = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+/**
+ * Helper to build full URL with query parameters.
+ * In the browser, uses relative URLs so requests go through the Next.js
+ * rewrite proxy (same-origin), which lets cookies flow automatically.
+ * On the server, uses the absolute backend URL.
  */
 function buildUrl(endpoint, params = {}) {
   const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
@@ -12,7 +26,9 @@ function buildUrl(endpoint, params = {}) {
       ? cleanEndpoint 
       : `${cleanEndpoint}/`;
 
-  const url = new URL(`${API_BASE_URL}${endpointWithSlash}`);
+  // In the browser, use relative URL for the Next.js proxy; on the server, use the full URL.
+  const base = isBrowser ? "" : API_BASE_URL;
+  const url = new URL(`${base}${endpointWithSlash}`, isBrowser ? window.location.origin : undefined);
 
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== "") {
@@ -27,6 +43,7 @@ function buildUrl(endpoint, params = {}) {
  * Handle HTTP response and parse JSON or extract errors
  */
 async function handleResponse(response) {
+  if (response.status === 204) return null;
   const contentType = response.headers.get("content-type");
   let data = null;
 
@@ -80,13 +97,16 @@ async function handleResponse(response) {
 export const apiClient = {
   get: async (endpoint, params = {}, options = {}) => {
     const url = buildUrl(endpoint, params);
+    const csrfToken = getCsrfToken();
     const response = await fetch(url, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
         "Accept": "application/json",
+        ...(csrfToken ? { "X-CSRFToken": csrfToken } : {}),
         ...options.headers,
       },
+      credentials: "include",
       ...options,
     });
     return handleResponse(response);
@@ -94,14 +114,17 @@ export const apiClient = {
 
   post: async (endpoint, body = {}, options = {}) => {
     const url = buildUrl(endpoint);
+    const csrfToken = getCsrfToken();
     const response = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Accept": "application/json",
+        ...(csrfToken ? { "X-CSRFToken": csrfToken } : {}),
         ...options.headers,
       },
       body: JSON.stringify(body),
+      credentials: "include",
       ...options,
     });
     return handleResponse(response);
@@ -109,14 +132,17 @@ export const apiClient = {
 
   put: async (endpoint, body = {}, options = {}) => {
     const url = buildUrl(endpoint);
+    const csrfToken = getCsrfToken();
     const response = await fetch(url, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
         "Accept": "application/json",
+        ...(csrfToken ? { "X-CSRFToken": csrfToken } : {}),
         ...options.headers,
       },
       body: JSON.stringify(body),
+      credentials: "include",
       ...options,
     });
     return handleResponse(response);
@@ -124,14 +150,17 @@ export const apiClient = {
 
   patch: async (endpoint, body = {}, options = {}) => {
     const url = buildUrl(endpoint);
+    const csrfToken = getCsrfToken();
     const response = await fetch(url, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
         "Accept": "application/json",
+        ...(csrfToken ? { "X-CSRFToken": csrfToken } : {}),
         ...options.headers,
       },
       body: JSON.stringify(body),
+      credentials: "include",
       ...options,
     });
     return handleResponse(response);
@@ -139,13 +168,16 @@ export const apiClient = {
 
   delete: async (endpoint, body = null, options = {}) => {
     const url = buildUrl(endpoint);
+    const csrfToken = getCsrfToken();
     const fetchOptions = {
       method: "DELETE",
       headers: {
         "Content-Type": "application/json",
         "Accept": "application/json",
+        ...(csrfToken ? { "X-CSRFToken": csrfToken } : {}),
         ...options.headers,
       },
+      credentials: "include",
       ...options,
     };
 

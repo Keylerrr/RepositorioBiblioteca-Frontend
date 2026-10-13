@@ -1,47 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { apiClient } from "@/shared/services/apiClient";
 
 /* ───────────── Cliente del API de auditoría (solo lectura) ───────────── */
-const BASE = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/+$/, "");
 const AUDIT = "/api/audit/logs";
 
-class ApiError extends Error {
-  constructor(status, message) {
-    super(message);
-    this.status = status;
-  }
-}
-
-const textOf = (data) =>
-  typeof data === "string"
-    ? data
-    : data && typeof data === "object"
-    ? Object.values(data).flat().filter((v) => typeof v === "string").join(" ")
-    : "";
-
 async function request(path, options = {}) {
-  if (!BASE) throw new ApiError(0, "Falta configurar NEXT_PUBLIC_API_URL.");
-  let res;
-  try {
-    res = await fetch(`${BASE}${path}`, options);
-  } catch (err) {
-    if (err?.name === "AbortError") throw err;
-    throw new ApiError(0, "No se pudo conectar con el servidor.");
-  }
-  const data = await res.json().catch(() => null);
-  if (!res.ok) {
-    throw new ApiError(
-      res.status,
-      textOf(data) ||
-        (res.status === 404
-          ? "El registro no existe."
-          : res.status >= 500
-          ? "El servidor tuvo un problema. Intenta de nuevo en unos minutos."
-          : "No se pudo completar la solicitud.")
-    );
-  }
-  return data;
+  const { signal, ...rest } = options;
+  return apiClient.get(path, {}, { signal, ...rest });
 }
 
 /* ───────────── Utilidades y estilos ───────────── */

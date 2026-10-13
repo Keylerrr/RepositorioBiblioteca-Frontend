@@ -11,7 +11,7 @@ const nextConfig = {
     return [
       // Avoid an empty wildcard producing a double slash in Vercel's destination.
       { source: "/api/platforms/", destination: `${apiUrl}/api/platforms/` },
-      ...["accounts", "harvesting", "platforms"].map((module) => ({
+      ...["accounts", "audit", "catalog", "harvesting", "journals", "platforms"].map((module) => ({
         source: `/api/${module}/:path*`, destination: `${apiUrl}/api/${module}/:path*/`,
       })),
     ];

@@ -7,6 +7,7 @@ import { journalService } from "../services/journalService";
 import { capitalizeWords } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import PublishJournalModal from "./PublishJournalModal";
 import {
   ArrowLeft,
   Edit3,
@@ -20,6 +21,7 @@ import {
   Link2,
   Ban,
   Database,
+  FileText,
 } from "lucide-react";
 
 function renderStatusBadge(journal) {
@@ -58,24 +60,31 @@ export default function JournalDetail({ journalId }) {
     editorials: [],
     knowledgeAreas: [],
     publishedPlatforms: [],
+    licenses: [],
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [actionMessage, setActionMessage] = useState(null);
   const [actionBusy, setActionBusy] = useState(false);
+  const [publishModalOpen, setPublishModalOpen] = useState(false);
 
   const loadDetail = async () => {
     setLoading(true);
     setError(null);
     try {
-      const [data, catData, kaData] = await Promise.all([
+      const [data, catData, kaData, licData] = await Promise.all([
         journalService.getJournalById(journalId),
         journalService.loadFormCatalogs(),
         journalService.getCatalogData("/api/catalog/knowledge-areas/"),
+        journalService.getLicenses().catch(() => []),
       ]);
 
       setJournal(data);
-      setCatalogs({ ...catData, knowledgeAreas: kaData });
+      setCatalogs({
+        ...catData,
+        knowledgeAreas: kaData,
+        licenses: Array.isArray(licData) ? licData : [],
+      });
     } catch (err) {
       console.error("Error loading journal detail:", err);
       setError(err.message || "No se pudo cargar la información de la revista.");
@@ -94,19 +103,6 @@ export default function JournalDetail({ journalId }) {
   const showToast = (msg) => {
     setActionMessage(msg);
     setTimeout(() => setActionMessage(null), 4000);
-  };
-
-  const handlePublish = async () => {
-    setActionBusy(true);
-    try {
-      await journalService.publishJournal(journalId);
-      showToast("La revista ha sido publicada exitosamente.");
-      await loadDetail();
-    } catch (err) {
-      alert(`Error al publicar: ${err.message}`);
-    } finally {
-      setActionBusy(false);
-    }
   };
 
   const handleDeactivate = async () => {
@@ -137,6 +133,24 @@ export default function JournalDetail({ journalId }) {
     }
   };
 
+  const formatSimpleDate = (dateStr) => {
+    if (!dateStr) return "Sin definir";
+    try {
+      const parts = String(dateStr).slice(0, 10).split("-");
+      if (parts.length === 3) {
+        const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+        return d.toLocaleDateString("es-ES", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        });
+      }
+      return dateStr;
+    } catch {
+      return dateStr;
+    }
+  };
+
   const formatItemName = (item, catalogList = []) => {
     if (!item) return "";
     if (typeof item === "object" && item !== null) {
@@ -162,6 +176,26 @@ export default function JournalDetail({ journalId }) {
   const resolvePlatformId = (entry) => {
     if (typeof entry?.platform === "object") return entry.platform.id;
     return entry?.platform ?? "—";
+  };
+
+  const resolvePlatformPublicUrl = (entry) => {
+    if (entry?.public_url) return entry.public_url;
+    if (typeof entry?.platform === "object" && entry.platform?.public_url) {
+      return entry.platform.public_url;
+    }
+    const platId = resolvePlatformId(entry);
+    const found = catalogs.publishedPlatforms.find((p) => String(p.id) === String(platId));
+    return found?.public_url || null;
+  };
+
+  const resolveLicenseName = (lic) => {
+    if (!lic) return "";
+    if (typeof lic === "object" && lic !== null) {
+      return lic.name || `ID #${lic.id}`;
+    }
+    const idNum = Number(lic);
+    const found = (catalogs.licenses || []).find((l) => l.id === idNum);
+    return found?.name || `Licencia #${idNum}`;
   };
 
   if (loading) {
@@ -240,7 +274,7 @@ export default function JournalDetail({ journalId }) {
 
           {!journal.active && (
             <Button
-              onClick={handlePublish}
+              onClick={() => setPublishModalOpen(true)}
               disabled={actionBusy}
               className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium gap-1.5 cursor-pointer"
             >
@@ -250,14 +284,27 @@ export default function JournalDetail({ journalId }) {
           )}
 
           {journal.active && (
-            <Button
-              onClick={handleDeactivate}
-              disabled={actionBusy}
-              className="rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-medium gap-1.5 cursor-pointer"
-            >
-              <Ban className="w-3.5 h-3.5" />
-              Desactivar
-            </Button>
+            <>
+              <Button
+                onClick={() => setPublishModalOpen(true)}
+                disabled={actionBusy}
+                variant="outline"
+                className="rounded-xl border-purple-200 text-purple-700 hover:bg-purple-50 text-xs font-medium gap-1.5 cursor-pointer"
+                title="Actualizar las licencias asignadas a esta revista"
+              >
+                <FileText className="w-3.5 h-3.5 text-purple-600" />
+                Actualizar Licencias
+              </Button>
+
+              <Button
+                onClick={handleDeactivate}
+                disabled={actionBusy}
+                className="rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-medium gap-1.5 cursor-pointer"
+              >
+                <Ban className="w-3.5 h-3.5" />
+                Desactivar
+              </Button>
+            </>
           )}
         </div>
       </div>
@@ -295,6 +342,17 @@ export default function JournalDetail({ journalId }) {
 
                 <div>
                   <span className="text-xs uppercase tracking-wide text-gray-500 font-semibold block">
+                    Fecha de publicación
+                  </span>
+                  <div className="mt-1.5 p-2.5 bg-slate-50 border border-slate-100 rounded-lg">
+                    <span className="text-[14px] sm:text-[15px] font-semibold text-slate-900">
+                      {formatSimpleDate(journal.publication_date)}
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-xs uppercase tracking-wide text-gray-500 font-semibold block">
                     Editorial
                   </span>
                   <div className="mt-1.5 p-2.5 bg-slate-50 border border-slate-100 rounded-lg">
@@ -323,34 +381,24 @@ export default function JournalDetail({ journalId }) {
 
                 <div>
                   <span className="text-xs uppercase tracking-wide text-gray-500 font-semibold block">
-                    Licencia
+                    Licencias
                   </span>
                   <div className="mt-1.5 p-2.5 bg-slate-50 border border-slate-100 rounded-lg">
-                    <span className="text-[14px] sm:text-[15px] font-semibold text-slate-900">
-                      {journal.license || "Sin definir"}
-                    </span>
-                  </div>
-                </div>
-
-                <div>
-                  <span className="text-xs uppercase tracking-wide text-gray-500 font-semibold block">
-                    Periodo Inicial
-                  </span>
-                  <div className="mt-1.5 p-2.5 bg-slate-50 border border-slate-100 rounded-lg">
-                    <span className="text-[14px] sm:text-[15px] font-semibold text-slate-900">
-                      {journal.start_period || "Sin definir"}
-                    </span>
-                  </div>
-                </div>
-
-                <div>
-                  <span className="text-xs uppercase tracking-wide text-gray-500 font-semibold block">
-                    Periodo Final
-                  </span>
-                  <div className="mt-1.5 p-2.5 bg-slate-50 border border-slate-100 rounded-lg">
-                    <span className="text-[14px] sm:text-[15px] font-semibold text-slate-900">
-                      {journal.finish_period || "Indefinido"}
-                    </span>
+                    {Array.isArray(journal.licenses) && journal.licenses.length > 0 ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {journal.licenses.map((lic, i) => (
+                          <span
+                            key={i}
+                            className="bg-purple-50 text-purple-800 border border-purple-200/60 font-semibold px-2.5 py-0.5 rounded-md text-xs flex items-center gap-1"
+                          >
+                            <FileText className="w-3 h-3 text-purple-600" />
+                            <span>{resolveLicenseName(lic)}</span>
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-slate-400 italic text-xs">Sin licencias asignadas</span>
+                    )}
                   </div>
                 </div>
 
@@ -377,6 +425,7 @@ export default function JournalDetail({ journalId }) {
             </CardContent>
           </Card>
 
+          {/* Indexación / Bases de datos */}
           <Card className="rounded-2xl border-gray-200/80 shadow-xs bg-white">
             <CardHeader className="border-b border-gray-100 pb-4">
               <CardTitle className="text-base font-bold text-gray-900 flex items-center gap-2">
@@ -390,84 +439,100 @@ export default function JournalDetail({ journalId }) {
                   Sin plataformas asociadas.
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {associatedPlatforms.map((entry, idx) => (
-                    <div
-                      key={entry.id || idx}
-                      className="p-4 rounded-xl border border-gray-100 bg-slate-50 space-y-3"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-[11px] uppercase tracking-wide text-gray-500 font-semibold">
-                            Plataforma ID #{resolvePlatformId(entry)}
-                          </p>
-                          <p className="text-sm font-bold text-slate-900 mt-0.5">
-                            {resolvePlatformName(entry)}
-                          </p>
-                        </div>
-                        <span
-                          className={`inline-block px-2.5 py-1 rounded-md text-xs font-semibold ${
-                            entry.has_full_text
-                              ? "bg-blue-50 text-blue-700 border border-blue-200/60"
-                              : "bg-gray-100 text-gray-700 border border-gray-200"
-                          }`}
-                        >
-                          {entry.has_full_text ? "Texto completo" : "Sin texto completo"}
-                        </span>
-                      </div>
+                <div className="space-y-4">
+                  {associatedPlatforms.map((entry, idx) => {
+                    const publicUrl = resolvePlatformPublicUrl(entry);
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                        <div>
-                          <span className="text-gray-500 font-semibold uppercase tracking-wide block">
-                            Cobertura
-                          </span>
-                          <span className="text-slate-900 font-semibold">
-                            {entry.start_period || "Sin inicio"} — {entry.finish_period || "Indefinido"}
+                    return (
+                      <div
+                        key={entry.id || idx}
+                        className="p-4 rounded-xl border border-gray-100 bg-slate-50 space-y-3"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-[11px] uppercase tracking-wide text-gray-500 font-semibold">
+                              Plataforma ID #{resolvePlatformId(entry)}
+                            </p>
+                            <p className="text-sm font-bold text-slate-900 mt-0.5">
+                              {resolvePlatformName(entry)}
+                            </p>
+                          </div>
+                          <span
+                            className={`inline-block px-2.5 py-1 rounded-md text-xs font-semibold ${
+                              entry.has_full_text
+                                ? "bg-blue-50 text-blue-700 border border-blue-200/60"
+                                : "bg-gray-100 text-gray-700 border border-gray-200"
+                            }`}
+                          >
+                            {entry.has_full_text ? "Texto completo" : "Sin texto completo"}
                           </span>
                         </div>
-                      </div>
 
-                      {entry.journal_url && (
-                        <div>
-                          <span className="text-xs uppercase tracking-wide text-gray-500 font-semibold block">
-                            URL de la revista
-                          </span>
-                          <div className="mt-1.5 p-3 bg-blue-50 border border-blue-200/80 rounded-lg flex items-center gap-2">
-                            <Link2 className="w-4 h-4 text-blue-500 shrink-0" />
-                            <a
-                              href={entry.journal_url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="font-semibold text-blue-700 hover:underline text-[14px] break-all flex items-center gap-1.5"
-                            >
-                              {entry.journal_url}
-                              <ExternalLink className="w-3.5 h-3.5 shrink-0" />
-                            </a>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                          <div>
+                            <span className="text-gray-500 font-semibold uppercase tracking-wide block">
+                              Cobertura en plataforma
+                            </span>
+                            <span className="text-slate-900 font-semibold">
+                              {entry.start_period || "Sin inicio"} — {entry.finish_period || "Indefinido"}
+                            </span>
                           </div>
                         </div>
-                      )}
 
-                      {entry.public_url && (
-                        <div>
-                          <span className="text-xs uppercase tracking-wide text-gray-500 font-semibold block">
-                            URL pública
-                          </span>
-                          <div className="mt-1.5 p-3 bg-blue-50 border border-blue-200/80 rounded-lg flex items-center gap-2">
-                            <Link2 className="w-4 h-4 text-blue-500 shrink-0" />
-                            <a
-                              href={entry.public_url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="font-semibold text-blue-700 hover:underline text-[14px] break-all flex items-center gap-1.5"
-                            >
-                              {entry.public_url}
-                              <ExternalLink className="w-3.5 h-3.5 shrink-0" />
-                            </a>
+                        {/* URL contextual de la revista */}
+                        {entry.journal_url && (
+                          <div>
+                            <span className="text-xs uppercase tracking-wide text-gray-500 font-semibold block">
+                              URL de la revista (contextual)
+                            </span>
+                            <div className="mt-1.5 p-3 bg-blue-50 border border-blue-200/80 rounded-lg flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 truncate">
+                                <Link2 className="w-4 h-4 text-blue-500 shrink-0" />
+                                <span className="font-semibold text-blue-700 text-xs font-mono truncate">
+                                  {entry.journal_url}
+                                </span>
+                              </div>
+                              <a
+                                href={entry.journal_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-blue-600 hover:text-blue-800 shrink-0 p-1 hover:bg-blue-100 rounded"
+                                title="Abrir URL de revista"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5" />
+                              </a>
+                            </div>
                           </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                        )}
+
+                        {/* URL general de la plataforma (solo lectura) */}
+                        {publicUrl && (
+                          <div>
+                            <span className="text-xs uppercase tracking-wide text-gray-500 font-semibold block">
+                              URL general de la plataforma (pública)
+                            </span>
+                            <div className="mt-1.5 p-3 bg-slate-100 border border-slate-200 rounded-lg flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 truncate">
+                                <Globe className="w-4 h-4 text-slate-500 shrink-0" />
+                                <span className="font-medium text-slate-700 text-xs font-mono truncate">
+                                  {publicUrl}
+                                </span>
+                              </div>
+                              <a
+                                href={publicUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-slate-600 hover:text-slate-900 shrink-0 p-1 hover:bg-slate-200 rounded"
+                                title="Abrir URL pública de plataforma"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5" />
+                              </a>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
@@ -637,6 +702,17 @@ export default function JournalDetail({ journalId }) {
           </Card>
         </div>
       </div>
+
+      {/* Modal para publicar con selección de licencias */}
+      <PublishJournalModal
+        journal={journal}
+        isOpen={publishModalOpen}
+        onClose={() => setPublishModalOpen(false)}
+        onSuccess={(msg) => {
+          showToast(msg);
+          loadDetail();
+        }}
+      />
     </div>
   );
 }
