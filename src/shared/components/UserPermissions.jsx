@@ -4,65 +4,9 @@ import { useEffect, useState } from "react";
 import Button from "@/shared/components/Button";
 import AccountFeedback from "@/shared/components/AccountFeedback";
 import UserPresetSelector from "@/shared/components/UserPresetSelector";
-import UserPermissionMatrix from "@/shared/components/UserPermissionMatrix";
+import UserPermissionMatrix, { normalizeCatalog, permissionsForCatalog, valueFor, enableRequiredViews, presetPermissionsAreValid } from "@/shared/components/UserPermissionMatrix";
 import { hasAccountPermission } from "@/shared/services/apiClient";
 import { useAccountsApi } from "@/shared/components/AccountsProvider";
-
-function actionsFor(catalog, section, resource) {
-  const entry = catalog?.[section]?.[resource];
-  return Array.isArray(entry) ? entry : entry?.actions || [];
-}
-
-function normalizeCatalog(response) {
-  const source = response?.permissions ?? response;
-  const isObject = (value) => value && typeof value === "object" && !Array.isArray(value);
-  if (!isObject(source)) throw new Error("El servidor no devolvió un catálogo de permisos válido.");
-  return Object.fromEntries(Object.entries(source).map(([section, resources]) => {
-    if (!isObject(resources)) throw new Error("El catálogo contiene una categoría inválida.");
-    return [section, Object.fromEntries(Object.entries(resources).map(([resource, entry]) => {
-      const actions = Array.isArray(entry) ? entry : entry?.actions;
-      if (!Array.isArray(actions) || actions.some((action) => typeof action !== "string" || !action)) {
-        throw new Error("El catálogo contiene acciones inválidas.");
-      }
-      return [resource, [...new Set(actions)]];
-    }))];
-  }));
-}
-
-function permissionsForCatalog(permissions, catalog) {
-  return Object.fromEntries(Object.entries(catalog).map(([section, resources]) => [
-    section, Object.fromEntries(Object.entries(resources).map(([resource, actions]) => [
-      resource, Object.fromEntries(actions.map((action) => [action, permissions?.[section]?.[resource]?.[action] === true])),
-    ])),
-  ]));
-}
-
-function valueFor(permissions, [section, resource, action]) {
-  return permissions?.[section]?.[resource]?.[action] === true;
-}
-
-function enableRequiredViews(permissions, catalog) {
-  for (const [section, resources] of Object.entries(permissions)) {
-    for (const [resource, actions] of Object.entries(resources)) {
-      if (Object.entries(actions).some(([action, value]) => action !== "view" && value === true) && actionsFor(catalog, section, resource).includes("view")) actions.view = true;
-    }
-  }
-  return permissions;
-}
-
-function presetPermissionsAreValid(permissions, catalog) {
-  const isObject = (value) => value && typeof value === "object" && !Array.isArray(value);
-  if (!isObject(permissions)) return false;
-  for (const [section, resources] of Object.entries(permissions)) {
-    if (!isObject(resources) || !Object.hasOwn(catalog, section)) return false;
-    for (const [resource, actions] of Object.entries(resources)) {
-      if (!isObject(actions) || !Object.hasOwn(catalog[section], resource)) return false;
-      const availableActions = actionsFor(catalog, section, resource);
-      if (Object.entries(actions).some(([action, value]) => typeof value !== "boolean" || !availableActions.includes(action))) return false;
-    }
-  }
-  return true;
-}
 
 function inheritedPermissions(user) {
   const result = {};

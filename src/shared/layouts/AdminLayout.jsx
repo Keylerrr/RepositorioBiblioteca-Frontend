@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { Suspense, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useAccountsApi } from "@/shared/components/AccountsProvider";
 import { 
   LayoutGrid, 
@@ -21,8 +21,14 @@ import {
 } from "lucide-react";
 
 export default function AdminLayout({ children }) {
+  return <Suspense fallback={<div role="status" className="p-8">Cargando administración…</div>}><AdminLayoutContent>{children}</AdminLayoutContent></Suspense>;
+}
+
+function AdminLayoutContent({ children }) {
   const accountsApi = useAccountsApi();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const presetsView = ["presets", "crear-preset", "editar-preset"].includes(searchParams.get("vista"));
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -61,6 +67,7 @@ export default function AdminLayout({ children }) {
       items: [
         { name: "Bitácora", href: "/admin/bitacora", icon: Clock },
         { name: "Administrativos", href: "/admin/usuarios", icon: Users },
+        { name: "Presets", href: "/admin/usuarios?vista=presets", icon: Users },
         { name: "Papelera", href: "/admin/papelera", icon: Trash2 },
       ]
     },
@@ -123,7 +130,9 @@ export default function AdminLayout({ children }) {
                 {group.items.map((item) => {
                   const Icon = item.icon;
                   // Manejo de estado activo: verifica si la ruta actual empieza con el href del item
-                  const isActive = pathname.startsWith(item.href);
+                  const isActive = item.name === "Presets" ? pathname === "/admin/usuarios" && presetsView
+                    : item.name === "Administrativos" ? pathname.startsWith(item.href) && !presetsView
+                    : pathname.startsWith(item.href);
 
                   return (
                     <Link

@@ -17,10 +17,66 @@ const LABELS = {
   pause: "Pausar", resume: "Reanudar", invite: "Invitar", manage_permissions: "Gestionar permisos",
 };
 
-function labelFor(key) {
+export function labelFor(key) {
   if (Object.hasOwn(LABELS, key)) return LABELS[key];
   const words = key.replace(/[-_]+/g, " ");
   return words.charAt(0).toLocaleUpperCase("es") + words.slice(1);
+}
+
+function actionsFor(catalog, section, resource) {
+  const entry = catalog?.[section]?.[resource];
+  return Array.isArray(entry) ? entry : entry?.actions || [];
+}
+
+export function normalizeCatalog(response) {
+  const source = response?.permissions ?? response;
+  const isObject = (value) => value && typeof value === "object" && !Array.isArray(value);
+  if (!isObject(source)) throw new Error("El servidor no devolvió un catálogo de permisos válido.");
+  return Object.fromEntries(Object.entries(source).map(([section, resources]) => {
+    if (!isObject(resources)) throw new Error("El catálogo contiene una categoría inválida.");
+    return [section, Object.fromEntries(Object.entries(resources).map(([resource, entry]) => {
+      const actions = Array.isArray(entry) ? entry : entry?.actions;
+      if (!Array.isArray(actions) || actions.some((action) => typeof action !== "string" || !action)) {
+        throw new Error("El catálogo contiene acciones inválidas.");
+      }
+      return [resource, [...new Set(actions)]];
+    }))];
+  }));
+}
+
+export function permissionsForCatalog(permissions, catalog) {
+  return Object.fromEntries(Object.entries(catalog).map(([section, resources]) => [
+    section, Object.fromEntries(Object.entries(resources).map(([resource, actions]) => [
+      resource, Object.fromEntries(actions.map((action) => [action, permissions?.[section]?.[resource]?.[action] === true])),
+    ])),
+  ]));
+}
+
+export function valueFor(permissions, [section, resource, action]) {
+  return permissions?.[section]?.[resource]?.[action] === true;
+}
+
+export function enableRequiredViews(permissions, catalog) {
+  for (const [section, resources] of Object.entries(permissions)) {
+    for (const [resource, actions] of Object.entries(resources)) {
+      if (Object.entries(actions).some(([action, value]) => action !== "view" && value === true) && actionsFor(catalog, section, resource).includes("view")) actions.view = true;
+    }
+  }
+  return permissions;
+}
+
+export function presetPermissionsAreValid(permissions, catalog) {
+  const isObject = (value) => value && typeof value === "object" && !Array.isArray(value);
+  if (!isObject(permissions)) return false;
+  for (const [section, resources] of Object.entries(permissions)) {
+    if (!isObject(resources) || !Object.hasOwn(catalog, section)) return false;
+    for (const [resource, actions] of Object.entries(resources)) {
+      if (!isObject(actions) || !Object.hasOwn(catalog[section], resource)) return false;
+      const availableActions = actionsFor(catalog, section, resource);
+      if (Object.entries(actions).some(([action, value]) => typeof value !== "boolean" || !availableActions.includes(action))) return false;
+    }
+  }
+  return true;
 }
 
 export default function UserPermissionMatrix({ catalog, isChecked, isInherited, disabled, onChange }) {

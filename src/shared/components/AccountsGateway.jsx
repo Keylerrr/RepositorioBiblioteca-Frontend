@@ -5,6 +5,9 @@ import HarvestingProvider from "@/features/admin/harvesting/components/Harvestin
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://repositorio-biblioteca-backend.onrender.com").replace(/\/+$/, "");
 const ALLOWED_ACCOUNT_MUTATIONS = [
+  ["POST", /^presets\/$/],
+  ["PATCH", /^presets\/\d+\/$/],
+  ["DELETE", /^presets\/\d+\/$/],
   ["POST", /^auth\/(login|logout)\/$/],
   ["POST", /^password\/change\/$/],
   ["POST", /^users\/invite\/$/],

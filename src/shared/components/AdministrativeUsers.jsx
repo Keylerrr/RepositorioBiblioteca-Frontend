@@ -102,7 +102,10 @@ export default function AdministrativeUsers() {
           <h1 className="text-[30px] leading-[41px] font-bold">Usuarios administrativos</h1>
           <p className="mt-3 text-[15px] text-[#6B758A]">Consulta el personal administrativo autorizado para gestionar y curar el directorio.</p>
         </div>
+        <div className="flex flex-wrap gap-3">
+        {(viewer?.is_superadmin || viewer?.effective_permissions?.accounts?.presets?.view) && <Button variant="outline" className={buttonStyle} href="/admin/usuarios?vista=presets">Presets de permisos</Button>}
         {hasAccountPermission(viewer, "invite") && <Button href="/admin/usuarios?vista=crear" className={`${primaryStyle} !h-[42px] min-w-40`}>Crear usuario</Button>}
+        </div>
       </header>
       <div className="grid gap-3 rounded-[10px] bg-white px-3 py-2.5 sm:grid-cols-[1fr_260px]">
         <FormField compact id="users-search" label="Buscar" type="search" placeholder="Código institucional, nombre o correo" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} />
