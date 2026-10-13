@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { Suspense, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useAccountsApi } from "@/shared/components/AccountsProvider";
@@ -21,6 +21,10 @@ import {
 } from "lucide-react";
 
 export default function AdminLayout({ children }) {
+  return <Suspense fallback={<div role="status" className="p-8">Cargando administración…</div>}><AdminLayoutContent>{children}</AdminLayoutContent></Suspense>;
+}
+
+function AdminLayoutContent({ children }) {
   const accountsApi = useAccountsApi();
   const pathname = usePathname();
   const searchParams = useSearchParams();
