@@ -9,12 +9,14 @@ const ALLOWED_ACCOUNT_MUTATIONS = [
   ["PATCH", /^presets\/\d+\/$/],
   ["DELETE", /^presets\/\d+\/$/],
   ["POST", /^auth\/(login|logout)\/$/],
-  ["POST", /^password\/change\/$/],
+  ["POST", /^password\/(change|forgot)\/$/],
   ["POST", /^users\/invite\/$/],
   ["PATCH", /^users\/\d+\/$/],
   ["DELETE", /^users\/\d+\/$/],
   ["PUT", /^users\/\d+\/permissions\/$/],
 ];
+
+const PUBLIC_MUTATIONS = ["/api/accounts/auth/login/", "/api/accounts/password/forgot/"];
 
 const ALLOWED_HARVEST_MUTATIONS = [
   ["POST", /^\/api\/harvesting\/schedules\/$/],
@@ -74,7 +76,7 @@ async function mutateBackend(path, method, body, timeoutMs = 90000) {
     const cookie = store.get(name);
     return cookie ? [[name, cookie.value]] : [];
   }));
-  if (path !== "/api/accounts/auth/login/" && !jar.get("sessionid")) {
+  if (!PUBLIC_MUTATIONS.includes(path) && !jar.get("sessionid")) {
     return { status: 401, data: { detail: "Inicia sesión para realizar esta operación." } };
   }
   const cookieHeader = () => [...jar].map(([name, value]) => `${name}=${value}`).join("; ");

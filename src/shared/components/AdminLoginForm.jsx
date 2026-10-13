@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +10,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import AccountFeedback from "@/shared/components/AccountFeedback";
 import { useAccountsApi } from "@/shared/components/AccountsProvider";
 
-function LoginField({ id, label, ...props }) {
+export function LoginField({ id, label, ...props }) {
   return <div className="space-y-2 rounded-md border border-gray-200 px-3 py-2 shadow-sm focus-within:border-gray-400 focus-within:ring-1 focus-within:ring-gray-400">
     <Label htmlFor={id} className="text-[11px] font-medium tracking-wider text-gray-500 uppercase">{label}</Label>
     <Input id={id} required className="h-7 border-0 p-0 text-base shadow-none placeholder:text-gray-400 focus-visible:ring-0" {...props} />
@@ -88,6 +89,9 @@ export default function AdminLoginForm() {
             <LoginField id="confirm-password" label="Confirmar nueva contraseña" type="password" autoComplete="new-password" minLength={12} value={confirmation} onChange={(event) => setConfirmation(event.target.value)} />
           </>}
         </fieldset>
+        {!mustChange && <div className="flex justify-end">
+          <Link href="/admin/recuperar-contrasena" className="text-sm font-medium text-[#C8102E] hover:underline">¿Olvidaste tu contraseña?</Link>
+        </div>}
         <p className="pt-1 text-[13px] text-gray-500">{mustChange ? "Usa al menos 12 caracteres. Evita claves comunes, solo numéricas o similares a tus datos personales." : "Usa tu correo institucional y la contraseña asignada."}</p>
       </CardContent>
       <CardFooter className="pt-2 pb-4">
