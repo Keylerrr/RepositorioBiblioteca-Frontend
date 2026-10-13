@@ -196,6 +196,7 @@ const accountQueries = {
   user: (id, signal) => accountsRequest(`users/${encodeURIComponent(id)}/`, { signal }),
   permissions: (signal) => accountsRequest("permissions/", { signal }),
   presets: (signal) => accountsRequest("presets/", { signal }),
+  preset: (id, signal) => accountsRequest(`presets/${encodeURIComponent(id)}/`, { signal }),
 };
 
 export function createAccountsApi(mutateAction) {
@@ -208,6 +209,9 @@ export function createAccountsApi(mutateAction) {
     invite: (body) => mutate("users/invite/", "POST", body),
     updateUser: (id, body) => mutate(`users/${encodeURIComponent(id)}/`, "PATCH", body),
     deactivate: (id) => mutate(`users/${encodeURIComponent(id)}/`, "DELETE"),
+    createPreset: (body) => mutate("presets/", "POST", body),
+    updatePreset: (id, body) => mutate(`presets/${encodeURIComponent(id)}/`, "PATCH", body),
+    deletePreset: (id) => mutate(`presets/${encodeURIComponent(id)}/`, "DELETE"),
     savePermissions: (id, permissions) => mutate(`users/${encodeURIComponent(id)}/permissions/`, "PUT", { permissions }),
   };
 }
