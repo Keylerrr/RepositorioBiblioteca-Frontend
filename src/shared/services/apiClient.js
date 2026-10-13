@@ -238,6 +238,7 @@ export function createAccountsApi(mutateAction) {
     login: (body) => mutate("auth/login/", "POST", body),
     logout: () => mutate("auth/logout/", "POST"),
     changePassword: (body) => mutate("password/change/", "POST", body),
+    forgotPassword: (body) => mutate("password/forgot/", "POST", body),
     invite: (body) => mutate("users/invite/", "POST", body),
     updateUser: (id, body) => mutate(`users/${encodeURIComponent(id)}/`, "PATCH", body),
     deactivate: (id) => mutate(`users/${encodeURIComponent(id)}/`, "DELETE"),
