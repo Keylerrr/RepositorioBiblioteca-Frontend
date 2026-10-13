@@ -379,7 +379,7 @@ export default function JournalTable() {
                         {capitalizeWords(journal.title)}
                       </span>
                     </td>
-                    <td className="py-4 px-6 text-gray-600 font-medium font-mono">
+                    <td className="py-4 px-6 text-gray-600 font-medium">
                       {journal.issn || "—"}
                     </td>
                     <td className="py-4 px-6 text-gray-600 font-medium">

@@ -279,7 +279,7 @@ export default function LicenseManagerModal({ isOpen, onClose, onLicensesUpdated
                         <span className="text-xs font-semibold text-gray-900 truncate">
                           {lic.name}
                         </span>
-                        <span className="text-[10px] text-gray-400 font-mono">#{lic.id}</span>
+                        <span className="text-[10px] text-gray-400">#{lic.id}</span>
                       </div>
 
                       <div className="flex items-center gap-1.5 shrink-0">

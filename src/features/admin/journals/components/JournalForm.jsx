@@ -10,7 +10,6 @@ import { Label } from "@/components/ui/label";
 import {
   ArrowLeft,
   AlertCircle,
-  Info,
   Check,
   Plus,
   Trash2,
@@ -422,14 +421,6 @@ export default function JournalForm({ initialData = null, isEdit = false }) {
       <div className="space-y-3 pt-2">
         <h2 className="text-sm font-bold text-gray-900">Cobertura y Clasificación</h2>
 
-        <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center gap-2 text-xs text-slate-700">
-          <Info className="w-4 h-4 text-slate-500 shrink-0" />
-          <span>
-            <strong>Cobertura temática (Áreas de conocimiento):</strong> Se derivará automáticamente a
-            partir de los programas académicos asociados.
-          </span>
-        </div>
-
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Idiomas */}
           <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-2xs space-y-2.5">
@@ -735,7 +726,7 @@ export default function JournalForm({ initialData = null, isEdit = false }) {
                           <span className="font-semibold text-blue-800 shrink-0">
                             URL pública (plataforma):
                           </span>
-                          <span className="font-mono text-blue-700 truncate">
+                          <span className="text-blue-700 truncate">
                             {selectedPlatform.public_url}
                           </span>
                         </div>

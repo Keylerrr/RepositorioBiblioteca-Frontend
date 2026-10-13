@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { platformService } from "../services/platformService";
+import { getUserDisplayName, userService } from "@/shared/services/userService";
 import { capitalizeWords } from "@/lib/utils";
 import DeleteModal from "./DeleteModal";
 import { Button } from "@/components/ui/button";
@@ -40,6 +41,7 @@ export default function DatabaseDetail({ platformId }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [actionMessage, setActionMessage] = useState(null);
+  const [userNames, setUserNames] = useState({});
 
   // Re-check loading state
   const [isRechecking, setIsRechecking] = useState(false);
@@ -59,7 +61,23 @@ export default function DatabaseDetail({ platformId }) {
         platformService.getCatalogData("/api/catalog/knowledge-areas/"),
       ]);
 
+      const auditUserIds = [...new Set(
+        ["created_by", "updated_by", "validated_by", "deleted_by"]
+          .map((field) => data[field])
+          .filter((value) => value !== null && value !== undefined && value !== "" && typeof value !== "object")
+      )];
+      const resolvedUsers = await Promise.all(
+        auditUserIds.map(async (id) => {
+          try {
+            return [String(id), getUserDisplayName(await userService.getUserById(id))];
+          } catch {
+            return [String(id), "—"];
+          }
+        })
+      );
+
       setPlatform(data);
+      setUserNames(Object.fromEntries(resolvedUsers));
       setCatalogs({ ...catData, knowledgeAreas: kaData });
 
       // Load link check logs history
@@ -86,6 +104,11 @@ export default function DatabaseDetail({ platformId }) {
   const showToast = (msg) => {
     setActionMessage(msg);
     setTimeout(() => setActionMessage(null), 4000);
+  };
+
+  const resolveUserName = (value) => {
+    if (value === null || value === undefined || value === "") return "—";
+    return typeof value === "object" ? getUserDisplayName(value) : userNames[String(value)] || "—";
   };
 
   // Direct Re-check handler (does NOT open modal, sends empty body payload {})
@@ -434,7 +457,7 @@ export default function DatabaseDetail({ platformId }) {
                       href={platform.base_api_url}
                       target="_blank"
                       rel="noreferrer"
-                      className="font-mono text-blue-600 hover:underline flex items-center gap-1.5 text-[14px] sm:text-[15px] break-all font-semibold"
+                      className="text-blue-600 hover:underline flex items-center gap-1.5 text-[14px] sm:text-[15px] break-all font-semibold"
                     >
                       {platform.base_api_url}
                       <ExternalLink className="w-3.5 h-3.5 shrink-0" />
@@ -484,7 +507,7 @@ export default function DatabaseDetail({ platformId }) {
                       className="p-3 rounded-xl border border-gray-100 bg-gray-50/50 flex items-center justify-between text-xs"
                     >
                       <div className="truncate pr-2">
-                        <span className="font-mono text-gray-800 block truncate font-semibold">{log.url || log.link}</span>
+                        <span className="text-gray-800 block truncate font-semibold">{log.url || log.link}</span>
                         <span className="text-[10px] text-gray-400">{formatDate(log.created_at || log.checked_at)}</span>
                       </div>
                       <span
@@ -515,9 +538,8 @@ export default function DatabaseDetail({ platformId }) {
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-6 space-y-4">
-              {/* Áreas de Conocimiento (Derivadas) */}
               <div>
-                <span className="text-xs uppercase tracking-wide text-gray-500 font-semibold block">Áreas de Conocimiento (Derivadas)</span>
+                <span className="text-xs uppercase tracking-wide text-gray-500 font-semibold block">Áreas de Conocimiento</span>
                 <div className="mt-1.5 p-2.5 bg-slate-50 border border-slate-100 rounded-lg">
                   {platform.knowledge_areas && platform.knowledge_areas.length > 0 ? (
                     <div className="flex flex-wrap gap-1.5">
@@ -534,7 +556,7 @@ export default function DatabaseDetail({ platformId }) {
                       })}
                     </div>
                   ) : (
-                    <span className="text-slate-400 italic text-xs">Sin áreas derivadas</span>
+                    <span className="text-slate-400 italic text-xs">—</span>
                   )}
                 </div>
               </div>
@@ -602,10 +624,20 @@ export default function DatabaseDetail({ platformId }) {
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-6 space-y-3">
+              {platform.validated_by != null && (
+                <div>
+                  <span className="text-xs uppercase tracking-wide text-gray-500 font-semibold block">Validado por</span>
+                  <div className="mt-1 p-2 bg-slate-50 border border-slate-100 rounded-lg">
+                    <span className="font-semibold text-slate-900 text-xs block">{resolveUserName(platform.validated_by)}</span>
+                    {platform.validated_at && <span className="text-[10px] text-gray-400 block">{formatDate(platform.validated_at)}</span>}
+                  </div>
+                </div>
+              )}
+
               <div>
                 <span className="text-xs uppercase tracking-wide text-gray-500 font-semibold block">Creado por</span>
                 <div className="mt-1 p-2 bg-slate-50 border border-slate-100 rounded-lg">
-                  <span className="font-semibold text-slate-900 text-xs block">{platform.created_by || "Sistema"}</span>
+                  <span className="font-semibold text-slate-900 text-xs block">{resolveUserName(platform.created_by)}</span>
                   <span className="text-[10px] text-gray-400 block">{formatDate(platform.created_at)}</span>
                 </div>
               </div>
@@ -613,10 +645,20 @@ export default function DatabaseDetail({ platformId }) {
               <div>
                 <span className="text-xs uppercase tracking-wide text-gray-500 font-semibold block">Última actualización</span>
                 <div className="mt-1 p-2 bg-slate-50 border border-slate-100 rounded-lg">
-                  <span className="font-semibold text-slate-900 text-xs block">{platform.updated_by || "Sistema"}</span>
+                  <span className="font-semibold text-slate-900 text-xs block">{resolveUserName(platform.updated_by)}</span>
                   <span className="text-[10px] text-gray-400 block">{formatDate(platform.updated_at)}</span>
                 </div>
               </div>
+
+              {platform.deleted_by != null && (
+                <div>
+                  <span className="text-xs uppercase tracking-wide text-gray-500 font-semibold block">Eliminado por</span>
+                  <div className="mt-1 p-2 bg-slate-50 border border-slate-100 rounded-lg">
+                    <span className="font-semibold text-slate-900 text-xs block">{resolveUserName(platform.deleted_by)}</span>
+                    {platform.deleted_at && <span className="text-[10px] text-gray-400 block">{formatDate(platform.deleted_at)}</span>}
+                  </div>
+                </div>
+              )}
 
               {platform.delete_explanation && (
                 <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs">
@@ -640,4 +682,3 @@ export default function DatabaseDetail({ platformId }) {
     </div>
   );
 }
-

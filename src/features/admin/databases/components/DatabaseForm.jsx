@@ -10,7 +10,6 @@ import { Label } from "@/components/ui/label";
 import { 
   ArrowLeft, 
   AlertCircle, 
-  Info,
   Check
 } from "lucide-react";
 
@@ -445,14 +444,6 @@ export default function DatabaseForm({ initialData = null, isEdit = false }) {
       <div className="space-y-3 pt-2">
         <h2 className="text-sm font-bold text-gray-900">Cobertura y Clasificación</h2>
 
-        {/* Cobertura temática (Mensaje informativo fijo) */}
-        <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center gap-2 text-xs text-slate-700">
-          <Info className="w-4 h-4 text-slate-500 shrink-0" />
-          <span>
-            <strong>Cobertura temática (Áreas de conocimiento):</strong> Se calculará automáticamente al guardar a partir de los programas académicos seleccionados.
-          </span>
-        </div>
-
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Institución responsable (Multi-Selección) */}
           <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-2xs space-y-2.5">
@@ -718,7 +709,7 @@ export default function DatabaseForm({ initialData = null, isEdit = false }) {
       <div className="space-y-4 pt-2">
         <div className="space-y-1">
           <h2 className="text-sm font-bold text-gray-900">Flujo de curaduría</h2>
-          <p className="text-[11px] text-gray-400 font-mono">
+          <p className="text-[11px] text-gray-400">
             Borrador → Pendiente de validación → Publicado → Obsoleto
           </p>
         </div>

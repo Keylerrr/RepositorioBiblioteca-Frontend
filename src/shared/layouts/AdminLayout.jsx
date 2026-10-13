@@ -83,7 +83,7 @@ function AdminLayoutContent({ children }) {
   ];
 
   return (
-    <div className="min-h-screen bg-[#F4F5F8] text-gray-900 flex flex-col md:flex-row antialiased">
+    <div className="min-h-screen bg-[#F4F5F8] text-gray-900 flex flex-col md:flex-row antialiased font-sans">
       {/* Mobile Top Navbar */}
       <div className="md:hidden bg-[#C8102E] px-4 py-3 flex items-center justify-between sticky top-0 z-40 text-white shadow-md">
         <div className="flex items-center gap-3">

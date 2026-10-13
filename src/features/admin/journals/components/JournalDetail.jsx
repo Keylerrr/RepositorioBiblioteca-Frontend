@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { journalService } from "../services/journalService";
+import { getUserDisplayName, userService } from "@/shared/services/userService";
 import { capitalizeWords } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -67,6 +68,7 @@ export default function JournalDetail({ journalId }) {
   const [actionMessage, setActionMessage] = useState(null);
   const [actionBusy, setActionBusy] = useState(false);
   const [publishModalOpen, setPublishModalOpen] = useState(false);
+  const [userNames, setUserNames] = useState({});
 
   const loadDetail = async () => {
     setLoading(true);
@@ -79,7 +81,23 @@ export default function JournalDetail({ journalId }) {
         journalService.getLicenses().catch(() => []),
       ]);
 
+      const auditUserIds = [...new Set(
+        ["created_by", "updated_by", "validated_by", "deleted_by"]
+          .map((field) => data[field])
+          .filter((value) => value !== null && value !== undefined && value !== "" && typeof value !== "object")
+      )];
+      const resolvedUsers = await Promise.all(
+        auditUserIds.map(async (id) => {
+          try {
+            return [String(id), getUserDisplayName(await userService.getUserById(id))];
+          } catch {
+            return [String(id), "—"];
+          }
+        })
+      );
+
       setJournal(data);
+      setUserNames(Object.fromEntries(resolvedUsers));
       setCatalogs({
         ...catData,
         knowledgeAreas: kaData,
@@ -198,6 +216,11 @@ export default function JournalDetail({ journalId }) {
     return found?.name || `Licencia #${idNum}`;
   };
 
+  const resolveUserName = (value) => {
+    if (value === null || value === undefined || value === "") return "—";
+    return typeof value === "object" ? getUserDisplayName(value) : userNames[String(value)] || "—";
+  };
+
   if (loading) {
     return (
       <div className="p-16 text-center text-gray-500">
@@ -257,7 +280,7 @@ export default function JournalDetail({ journalId }) {
               </h1>
               {renderStatusBadge(journal)}
             </div>
-            <p className="text-xs text-gray-500 mt-0.5 font-mono">ISSN: {journal.issn || "—"}</p>
+            <p className="text-xs text-gray-500 mt-0.5">ISSN: {journal.issn || "—"}</p>
           </div>
         </div>
 
@@ -334,7 +357,7 @@ export default function JournalDetail({ journalId }) {
                 <div>
                   <span className="text-xs uppercase tracking-wide text-gray-500 font-semibold block">ISSN</span>
                   <div className="mt-1.5 p-2.5 bg-slate-50 border border-slate-100 rounded-lg">
-                    <span className="text-[14px] sm:text-[15px] font-semibold text-slate-900 font-mono">
+                    <span className="text-[14px] sm:text-[15px] font-semibold text-slate-900">
                       {journal.issn || "—"}
                     </span>
                   </div>
@@ -488,7 +511,7 @@ export default function JournalDetail({ journalId }) {
                             <div className="mt-1.5 p-3 bg-blue-50 border border-blue-200/80 rounded-lg flex items-center justify-between gap-2">
                               <div className="flex items-center gap-2 truncate">
                                 <Link2 className="w-4 h-4 text-blue-500 shrink-0" />
-                                <span className="font-semibold text-blue-700 text-xs font-mono truncate">
+                                <span className="font-semibold text-blue-700 text-xs truncate">
                                   {entry.journal_url}
                                 </span>
                               </div>
@@ -514,7 +537,7 @@ export default function JournalDetail({ journalId }) {
                             <div className="mt-1.5 p-3 bg-slate-100 border border-slate-200 rounded-lg flex items-center justify-between gap-2">
                               <div className="flex items-center gap-2 truncate">
                                 <Globe className="w-4 h-4 text-slate-500 shrink-0" />
-                                <span className="font-medium text-slate-700 text-xs font-mono truncate">
+                                <span className="font-medium text-slate-700 text-xs truncate">
                                   {publicUrl}
                                 </span>
                               </div>
@@ -550,7 +573,7 @@ export default function JournalDetail({ journalId }) {
             <CardContent className="pt-6 space-y-4">
               <div>
                 <span className="text-xs uppercase tracking-wide text-gray-500 font-semibold block">
-                  Áreas de Conocimiento (Derivadas)
+                  Áreas de Conocimiento
                 </span>
                 <div className="mt-1.5 p-2.5 bg-slate-50 border border-slate-100 rounded-lg">
                   {journal.knowledge_areas && journal.knowledge_areas.length > 0 ? (
@@ -568,7 +591,7 @@ export default function JournalDetail({ journalId }) {
                       })}
                     </div>
                   ) : (
-                    <span className="text-slate-400 italic text-xs">Sin áreas derivadas</span>
+                    <span className="text-slate-400 italic text-xs">—</span>
                   )}
                 </div>
               </div>
@@ -675,13 +698,32 @@ export default function JournalDetail({ journalId }) {
                 </div>
               </div>
 
+              {journal.validated_by != null && (
+                <div>
+                  <span className="text-xs uppercase tracking-wide text-gray-500 font-semibold block">Validado por</span>
+                  <div className="mt-1 p-2 bg-slate-50 border border-slate-100 rounded-lg">
+                    <span className="font-semibold text-slate-900 text-xs block">{resolveUserName(journal.validated_by)}</span>
+                  </div>
+                </div>
+              )}
+
+              {journal.deleted_by != null && (
+                <div>
+                  <span className="text-xs uppercase tracking-wide text-gray-500 font-semibold block">Eliminado por</span>
+                  <div className="mt-1 p-2 bg-slate-50 border border-slate-100 rounded-lg">
+                    <span className="font-semibold text-slate-900 text-xs block">{resolveUserName(journal.deleted_by)}</span>
+                    {journal.deleted_at && <span className="text-[10px] text-gray-400 block">{formatDate(journal.deleted_at)}</span>}
+                  </div>
+                </div>
+              )}
+
               <div>
                 <span className="text-xs uppercase tracking-wide text-gray-500 font-semibold block">
                   Creado por
                 </span>
                 <div className="mt-1 p-2 bg-slate-50 border border-slate-100 rounded-lg">
                   <span className="font-semibold text-slate-900 text-xs block">
-                    {journal.created_by || "Sistema"}
+                    {resolveUserName(journal.created_by)}
                   </span>
                   <span className="text-[10px] text-gray-400 block">{formatDate(journal.created_at)}</span>
                 </div>
@@ -693,7 +735,7 @@ export default function JournalDetail({ journalId }) {
                 </span>
                 <div className="mt-1 p-2 bg-slate-50 border border-slate-100 rounded-lg">
                   <span className="font-semibold text-slate-900 text-xs block">
-                    {journal.updated_by || "Sistema"}
+                    {resolveUserName(journal.updated_by)}
                   </span>
                   <span className="text-[10px] text-gray-400 block">{formatDate(journal.updated_at)}</span>
                 </div>

@@ -385,7 +385,7 @@ export default function DatabaseTable() {
                         <div>
                           <span className="block font-semibold text-gray-900">{capitalizeWords(platform.name)}</span>
                           {platform.public_url && (
-                            <span className="text-[10px] text-blue-500 block font-mono truncate max-w-[220px]">
+                            <span className="text-[10px] text-blue-500 block truncate max-w-[220px]">
                               {platform.public_url}
                             </span>
                           )}
