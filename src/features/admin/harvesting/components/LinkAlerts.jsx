@@ -8,6 +8,7 @@ import FormField from "@/shared/components/FormField";
 import Notice from "@/shared/components/Notice";
 import { formatDate, getLatestLinkChecks, getLinkChecks, getPlatforms } from "@/features/admin/harvesting/harvesting";
 import { useHarvestingApi } from "./HarvestingProvider";
+import { clampPage, sanitizePageValue } from "@/shared/utils/pagination";
 
 const PAGE_SIZE = 10;
 
@@ -20,6 +21,7 @@ export default function LinkAlerts() {
   const [links, setLinks] = useState([]);
   const [selected, setSelected] = useState([]);
   const [page, setPage] = useState(1);
+  const [pageInput, setPageInput] = useState("1");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [revision, setRevision] = useState(0);
@@ -142,6 +144,17 @@ export default function LinkAlerts() {
   const totalPages = Math.max(1, Math.ceil(links.length / PAGE_SIZE));
   const rows = links.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
+  function submitPageNumber() {
+    const result = sanitizePageValue(pageInput, totalPages);
+    if (!result.valid) {
+      setPageInput(String(clampPage(page, totalPages)));
+      return;
+    }
+    const nextPage = result.page;
+    if (nextPage !== page) setPage(nextPage);
+    setPageInput(String(nextPage));
+  }
+
   return (
     <div className="flex-1 bg-[#F7F8FA] font-sans text-sm leading-[22px] text-[#171A1F]">
       <div className="mx-auto flex w-full max-w-[1088px] flex-col gap-5">
@@ -154,9 +167,36 @@ export default function LinkAlerts() {
           {!loading && !error && (links.length ? <AdminTable caption="Disponibilidad de enlaces. Selecciona los recursos por su nombre para revisarlos." variant="alerts" columns={columns} rows={rows} rowClassName={(row) => selected.includes(row.platform) ? "bg-[#DFECFF]" : ""} /> : <p className="p-5 text-[#68707C]">Todavía no hay verificaciones de enlaces registradas.</p>)}
         </div>
         {!loading && !error && totalPages > 1 && <div className="flex flex-wrap items-center gap-3">
-          <Button variant="quiet" size="small" disabled={page <= 1 || busy} onClick={() => setPage(page - 1)}>Anterior</Button>
-          <span>Página {page} de {totalPages}</span>
-          <Button variant="quiet" size="small" disabled={page >= totalPages || busy} onClick={() => setPage(page + 1)}>Siguiente</Button>
+          <Button variant="quiet" size="small" disabled={page <= 1 || busy} onClick={() => {
+            const nextPage = clampPage(page - 1, totalPages);
+            setPage(nextPage);
+            setPageInput(String(nextPage));
+          }}>Anterior</Button>
+          <label className="flex items-center gap-2 text-sm text-[#68707C]">
+            <span>Página</span>
+            <input
+              aria-label="Número de página actual"
+              type="number"
+              min={1}
+              max={totalPages}
+              value={pageInput}
+              onChange={(event) => setPageInput(event.target.value)}
+              onBlur={() => setPageInput(String(clampPage(page, totalPages)))}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  submitPageNumber();
+                }
+              }}
+              className="w-14 rounded-md border border-[#DCE0E5] bg-white px-2 py-1 text-center text-sm font-semibold text-[#171A1F] outline-none focus:border-[#A90D27]"
+            />
+            <span>de {totalPages}</span>
+          </label>
+          <Button variant="quiet" size="small" disabled={page >= totalPages || busy} onClick={() => {
+            const nextPage = clampPage(page + 1, totalPages);
+            setPage(nextPage);
+            setPageInput(String(nextPage));
+          }}>Siguiente</Button>
         </div>}
         <div><Button className="min-w-[260px]" disabled={loading || busy || Boolean(error) || !selected.length} onClick={() => verify(links.filter((row) => selected.includes(row.platform)))}>{busy ? "Verificando…" : "Revisar enlaces seleccionados"}</Button></div>
         <p className="text-xs leading-[18px] text-[#68707C]">Se muestra la última verificación de cada plataforma, incluidos los enlaces disponibles. Selecciona los recursos por su nombre. {selected.length > 0 && `${selected.length} ${selected.length === 1 ? "seleccionado" : "seleccionados"}.`} Fechas en America/Bogota.</p>

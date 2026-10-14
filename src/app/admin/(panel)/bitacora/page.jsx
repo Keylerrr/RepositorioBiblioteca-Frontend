@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiClient } from "@/shared/services/apiClient";
+import { clampPage, sanitizePageValue } from "@/shared/utils/pagination";
 
 /* ───────────── Cliente del API de auditoría (solo lectura) ───────────── */
 const AUDIT = "/api/audit/logs";
@@ -103,6 +104,7 @@ const primary = `rounded-md bg-[#c8102e] px-4 py-2 text-sm font-semibold text-wh
 const secondary = `rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 ${focus}`;
 
 const EMPTY_FILTERS = { search: "", action: "", resource: "", actor: "", objectId: "", range: "30d", from: "", to: "" };
+const PAGE_SIZE = 10;
 
 /* ───────────── Componentes ───────────── */
 function Modal({ title, subtitle, onClose, children }) {
@@ -274,7 +276,7 @@ export default function Page() {
   const [searchText, setSearchText] = useState("");
   const [ordering, setOrdering] = useState("-timestamp");
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageInput, setPageInput] = useState("1");
   const [refresh, setRefresh] = useState(0);
 
   const [data, setData] = useState(null);
@@ -313,7 +315,7 @@ export default function Page() {
   );
 
   const query = useMemo(() => {
-    const qs = new URLSearchParams({ ordering, page: String(page), page_size: String(pageSize) });
+    const qs = new URLSearchParams({ ordering, page: String(page), page_size: String(PAGE_SIZE) });
     if (filters.search.trim()) qs.set("search", filters.search.trim());
     if (filters.action) qs.set("action_name", filters.action);
     if (filters.resource) qs.set("resource", filters.resource);
@@ -323,7 +325,7 @@ export default function Page() {
     else if (filters.actor) qs.set("actor", filters.actor);
     Object.entries(dates).forEach(([k, v]) => qs.set(k, v));
     return qs.toString();
-  }, [filters, dates, ordering, page, pageSize]);
+  }, [filters, dates, ordering, page]);
 
   // Listado paginado en el servidor
   useEffect(() => {
@@ -376,6 +378,17 @@ export default function Page() {
   const totalItems = data?.total_items ?? 0;
   const totalPages = data?.total_pages ?? 1;
   const firstItem = rows[0]?.item_number ?? 0;
+
+  function submitPageNumber() {
+    const result = sanitizePageValue(pageInput, totalPages);
+    if (!result.valid) {
+      setPageInput(String(clampPage(page, totalPages)));
+      return;
+    }
+    const nextPage = result.page;
+    if (nextPage !== page) setPage(nextPage);
+    setPageInput(String(nextPage));
+  }
   const lastItem = rows.length ? (rows[rows.length - 1].item_number ?? firstItem + rows.length - 1) : 0;
 
   const filtersActive =
@@ -575,26 +588,38 @@ export default function Page() {
               {totalItems ? `Mostrando ${firstItem}–${lastItem} de ${totalItems}` : "Sin resultados"}
             </p>
             <div className="flex flex-wrap items-center gap-3">
-              <label className="flex items-center gap-2">
-                Por página
-                <select
-                  value={pageSize}
-                  onChange={(e) => {
-                    setPageSize(Number(e.target.value));
-                    setPage(1);
-                  }}
-                  className={`${control} w-20`}
-                >
-                  {[10, 20, 50, 100].map((n) => (
-                    <option key={n} value={n}>{n}</option>
-                  ))}
-                </select>
-              </label>
-              <button type="button" onClick={() => setPage((p) => p - 1)} disabled={loading || !data.previous} className={secondary}>
+              <button type="button" onClick={() => {
+                const nextPage = clampPage(page - 1, totalPages);
+                setPage(nextPage);
+                setPageInput(String(nextPage));
+              }} disabled={loading || !data.previous} className={secondary}>
                 Anterior
               </button>
-              <span className="tabular-nums">Página {data.current_page ?? page} de {totalPages}</span>
-              <button type="button" onClick={() => setPage((p) => p + 1)} disabled={loading || !data.next} className={secondary}>
+              <label className="flex items-center gap-2 text-sm text-slate-600">
+                <span>Página</span>
+                <input
+                  aria-label="Número de página actual"
+                  type="number"
+                  min={1}
+                  max={totalPages}
+                  value={pageInput}
+                  onChange={(event) => setPageInput(event.target.value)}
+                  onBlur={() => setPageInput(String(clampPage(page, totalPages)))}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      submitPageNumber();
+                    }
+                  }}
+                  className="w-14 rounded-md border border-slate-300 bg-white px-2 py-1 text-center text-sm font-medium text-slate-900 outline-none focus:border-[#c8102e]"
+                />
+                <span>de {totalPages}</span>
+              </label>
+              <button type="button" onClick={() => {
+                const nextPage = clampPage(page + 1, totalPages);
+                setPage(nextPage);
+                setPageInput(String(nextPage));
+              }} disabled={loading || !data.next} className={secondary}>
                 Siguiente
               </button>
             </div>

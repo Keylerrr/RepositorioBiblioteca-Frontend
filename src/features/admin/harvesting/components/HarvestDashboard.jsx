@@ -9,6 +9,7 @@ import Notice from "@/shared/components/Notice";
 import { formatDate, getHarvests, getHarvestSourceCount, getUpcomingSchedules } from "@/features/admin/harvesting/harvesting";
 import HarvestExecutions from "./HarvestExecutions";
 import { useHarvestingApi } from "./HarvestingProvider";
+import { clampPage, sanitizePageValue } from "@/shared/utils/pagination";
 
 const FREQUENCIES = { once: "Única", daily: "Diaria", weekly: "Semanal", monthly: "Mensual" };
 const SCHEDULE_PAGE_SIZE = 10;
@@ -69,7 +70,9 @@ function useHarvestData(loadData, intervalMs = null) {
 export default function HarvestDashboard() {
   const { deactivateSchedule, runDueSchedules } = useHarvestingApi();
   const [page, setPage] = useState(1);
+  const [pageInput, setPageInput] = useState("1");
   const [schedulePage, setSchedulePage] = useState(1);
+  const [schedulePageInput, setSchedulePageInput] = useState("1");
   const [executing, setExecuting] = useState(false);
   const [executionFeedback, setExecutionFeedback] = useState(null);
   const [selectedSchedule, setSelectedSchedule] = useState(null);
@@ -144,11 +147,41 @@ export default function HarvestDashboard() {
   }];
 
   function changePage(nextPage, schedules = false) {
-    if (schedules) setSchedulePage(nextPage);
-    else {
+    if (schedules) {
+      const safePage = clampPage(nextPage, schedulePages);
+      setSchedulePage(safePage);
+      setSchedulePageInput(String(safePage));
+      return;
+    }
+    const safePage = clampPage(nextPage, Math.max(1, harvests.data?.total_pages ?? 1));
+    setPage(safePage);
+    setPageInput(String(safePage));
+    harvests.refresh();
+  }
+
+  function submitPageNumber() {
+    const result = sanitizePageValue(pageInput, Math.max(1, harvests.data?.total_pages ?? 1));
+    if (!result.valid) {
+      setPageInput(String(clampPage(page, Math.max(1, harvests.data?.total_pages ?? 1))));
+      return;
+    }
+    const nextPage = result.page;
+    if (nextPage !== page) {
       setPage(nextPage);
       harvests.refresh();
     }
+    setPageInput(String(nextPage));
+  }
+
+  function submitSchedulePageNumber() {
+    const result = sanitizePageValue(schedulePageInput, schedulePages);
+    if (!result.valid) {
+      setSchedulePageInput(String(clampPage(schedulePage, schedulePages)));
+      return;
+    }
+    const nextPage = result.page;
+    if (nextPage !== schedulePage) setSchedulePage(nextPage);
+    setSchedulePageInput(String(nextPage));
   }
 
   const runs = harvests.data?.results || [];
@@ -189,7 +222,26 @@ export default function HarvestDashboard() {
           {showHarvests && <HarvestExecutions rows={runs} onRefresh={harvests.refresh} busy={harvests.loading || Boolean(harvests.error)} />}
           {showHarvests && harvests.data.total_pages > 1 && <div className="flex flex-wrap items-center gap-3">
             <Button variant="quiet" size="small" disabled={harvests.loading || page <= 1} onClick={() => changePage(page - 1)}>Anterior</Button>
-            <span>Página {page} de {harvests.data.total_pages} · {harvests.data.total_items} ejecuciones</span>
+            <label className="flex items-center gap-2 text-sm text-[#68707C]">
+              <span>Página</span>
+              <input
+                aria-label="Número de página actual"
+                type="number"
+                min={1}
+                max={harvests.data.total_pages}
+                value={pageInput}
+                onChange={(event) => setPageInput(event.target.value)}
+                onBlur={() => setPageInput(String(clampPage(page, Math.max(1, harvests.data?.total_pages ?? 1))))}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    submitPageNumber();
+                  }
+                }}
+                className="w-14 rounded-md border border-[#DCE0E5] bg-white px-2 py-1 text-center text-sm font-semibold text-[#171A1F] outline-none focus:border-[#A90D27]"
+              />
+              <span>de {harvests.data.total_pages} · {harvests.data.total_items} ejecuciones</span>
+            </label>
             <Button variant="quiet" size="small" disabled={harvests.loading || page >= harvests.data.total_pages} onClick={() => changePage(page + 1)}>Siguiente</Button>
           </div>}
           <Button href="/admin/cosecha/nueva" className="mt-auto w-[220px] self-start">Nueva cosecha</Button>
@@ -217,7 +269,26 @@ export default function HarvestDashboard() {
           </form>}
           {upcomingSchedules.data && schedulePages > 1 && <div className="flex flex-wrap items-center gap-3">
             <Button variant="quiet" size="small" disabled={upcomingSchedules.loading || schedulePage <= 1} onClick={() => changePage(schedulePage - 1, true)}>Anterior</Button>
-            <span>Página {schedulePage} de {schedulePages} · {scheduleCount} programaciones</span>
+            <label className="flex items-center gap-2 text-sm text-[#68707C]">
+              <span>Página</span>
+              <input
+                aria-label="Número de página de programaciones"
+                type="number"
+                min={1}
+                max={schedulePages}
+                value={schedulePageInput}
+                onChange={(event) => setSchedulePageInput(event.target.value)}
+                onBlur={() => setSchedulePageInput(String(clampPage(schedulePage, schedulePages)))}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    submitSchedulePageNumber();
+                  }
+                }}
+                className="w-14 rounded-md border border-[#DCE0E5] bg-white px-2 py-1 text-center text-sm font-semibold text-[#171A1F] outline-none focus:border-[#A90D27]"
+              />
+              <span>de {schedulePages} · {scheduleCount} programaciones</span>
+            </label>
             <Button variant="quiet" size="small" disabled={upcomingSchedules.loading || schedulePage >= schedulePages} onClick={() => changePage(schedulePage + 1, true)}>Siguiente</Button>
           </div>}
         </section>
