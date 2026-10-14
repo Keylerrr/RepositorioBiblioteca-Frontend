@@ -38,7 +38,7 @@ export default function AdministrativeUserForm({ userId }) {
         authenticated = true;
         if (current.force_password_change) throw new Error("Debes cambiar tu contraseña provisional desde el inicio de sesión.");
         setViewer(current);
-        if (!hasAccountPermission(current, editing ? "edit" : "invite")) throw new Error(`Tu cuenta no tiene autorización para ${editing ? "editar" : "crear"} usuarios administrativos.`);
+        if (!hasAccountPermission(current, editing ? "update" : "invite")) throw new Error(`Tu cuenta no tiene autorización para ${editing ? "editar" : "crear"} usuarios administrativos.`);
         if (editing) {
           if (!hasAccountPermission(current, "view")) throw new Error("Tu cuenta no tiene permiso para consultar usuarios administrativos.");
           const user = await getUser(userId, controller.signal);
@@ -58,7 +58,7 @@ export default function AdministrativeUserForm({ userId }) {
     return () => controller.abort();
   }, [getViewer, getUser, editing, userId, refresh]);
 
-  const canSubmit = hasAccountPermission(viewer, editing ? "edit" : "invite") && (!editing || Boolean(originalUser));
+  const canSubmit = hasAccountPermission(viewer, editing ? "update" : "invite") && (!editing || Boolean(originalUser));
   function update(event) {
     setForm((current) => ({ ...current, [event.target.name]: event.target.value }));
   }
