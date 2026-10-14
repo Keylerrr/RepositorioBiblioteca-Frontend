@@ -70,7 +70,7 @@ export default function AdministrativeUserForm({ userId }) {
     setError(null);
     try {
       const body = {
-        email: form.email.trim(), full_name: form.full_name.trim(), collegue_code: form.collegue_code.trim(),
+        ...(!editing && { email: form.email.trim() }), full_name: form.full_name.trim(), collegue_code: form.collegue_code.trim(),
       };
       const user = editing ? await accountsApi.updateUser(userId, body) : await accountsApi.invite(body);
       setCreatedUser(editing ? { ...originalUser, ...body, ...user } : user);
@@ -100,7 +100,7 @@ export default function AdministrativeUserForm({ userId }) {
           <div className="grid gap-3 md:grid-cols-3">
             <FormField compact id="user-code" label="Código institucional" name="collegue_code" placeholder="Ej. 10584" value={form.collegue_code} onChange={update} />
             <FormField compact id="user-name" label="Nombre completo" name="full_name" autoComplete="name" placeholder="Nombres y apellidos" value={form.full_name} onChange={update} />
-            <FormField compact id="user-email" label="Correo institucional *" name="email" type="email" autoComplete="email" required placeholder="usuario@ufps.edu.co" value={form.email} onChange={update} />
+            <FormField compact id="user-email" label={editing ? "Correo institucional" : "Correo institucional *"} name="email" type="email" autoComplete="email" required={!editing} disabled={editing} placeholder="usuario@ufps.edu.co" value={form.email} onChange={update} />
           </div>
         </fieldset>
         {editing && originalUser && hasAccountPermission(viewer, "manage_permissions") && <div>
