@@ -103,22 +103,6 @@ export default function AdministrativeUserForm({ userId }) {
             <FormField compact id="user-email" label="Correo institucional *" name="email" type="email" autoComplete="email" required placeholder="usuario@ufps.edu.co" value={form.email} onChange={update} />
           </div>
         </fieldset>
-        <fieldset>
-          <legend className="mb-2 text-base font-semibold">Acceso</legend>
-          <div className="grid gap-3 md:grid-cols-3">
-            <FormField compact id="user-password" label={editing ? "Nueva contraseña (opcional)" : "Contraseña provisional"} value={editing ? "Se conserva la contraseña actual" : "Se genera y envía por correo"} readOnly />
-            <FormField compact id="user-initial-status" label={editing ? "Estado" : "Estado inicial"} value={editing ? originalUser ? originalUser.is_active ? "Activo" : "Inactivo" : "—" : "Activo"} readOnly />
-            <FormField compact id="user-notification" label={editing ? "Notificar cambios por correo" : "Notificar por correo"} value={editing ? "No disponible" : "Sí, al crear la cuenta"} readOnly />
-          </div>
-          {editing && <p className="mt-2 text-xs text-[#6B758A]">Desde este formulario se actualizan los datos personales. La contraseña y el estado se conservan; las notificaciones de cambios aún no están disponibles.</p>}
-        </fieldset>
-        <fieldset>
-          <legend className="mb-2 text-base font-semibold">Trazabilidad</legend>
-          <div className="grid gap-3 md:grid-cols-3">
-            <FormField compact id="user-creator" label="Creado por" value={editing ? originalUser?.created_by?.full_name || (typeof originalUser?.created_by === "string" ? originalUser.created_by : "—") : viewer?.full_name || viewer?.email || "Administrador actual"} readOnly />
-            <FormField compact id="user-created-at" label="Fecha de creación" value={editing ? originalUser?.created_at ? new Date(originalUser.created_at).toLocaleDateString("es-CO", { day: "2-digit", month: "short", year: "numeric" }) : "—" : "Se asignará al guardar"} readOnly />
-          </div>
-        </fieldset>
         <div>
           <h2 className="text-base font-semibold">Permisos individuales</h2>
           <p className="mt-2 text-xs text-[#6B758A]">{editing ? "Los permisos se configuran por usuario. Los cambios de datos y accesos quedarán registrados en la bitácora." : "Los permisos se asignan por usuario y podrán configurarse después del alta. La cuenta se crea sin permisos."}</p>
