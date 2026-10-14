@@ -1,3 +1,5 @@
+import { notifySessionExpired, shouldSkipSessionExpiredAlert } from "@/shared/utils/sessionExpiration";
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
 const isBrowser = typeof window !== "undefined";
@@ -42,7 +44,7 @@ function buildUrl(endpoint, params = {}) {
 /**
  * Handle HTTP response and parse JSON or extract errors
  */
-async function handleResponse(response) {
+async function handleResponse(response, endpoint = "") {
   if (response.status === 204) return null;
   const contentType = response.headers.get("content-type");
   let data = null;
@@ -85,9 +87,15 @@ async function handleResponse(response) {
       }
     }
 
+    const authExpired = response.status === 401 && !shouldSkipSessionExpiredAlert(endpoint || response.url || "");
+    if (authExpired) {
+      notifySessionExpired(errorMessage, { endpoint: endpoint || response.url || "", status: response.status });
+    }
+
     const error = new Error(errorMessage);
     error.status = response.status;
     error.data = data;
+    error.authExpired = authExpired;
     throw error;
   }
 
@@ -109,7 +117,7 @@ export const apiClient = {
       credentials: "include",
       ...options,
     });
-    return handleResponse(response);
+    return handleResponse(response, endpoint);
   },
 
   post: async (endpoint, body = {}, options = {}) => {
@@ -127,7 +135,7 @@ export const apiClient = {
       credentials: "include",
       ...options,
     });
-    return handleResponse(response);
+    return handleResponse(response, endpoint);
   },
 
   put: async (endpoint, body = {}, options = {}) => {
@@ -145,7 +153,7 @@ export const apiClient = {
       credentials: "include",
       ...options,
     });
-    return handleResponse(response);
+    return handleResponse(response, endpoint);
   },
 
   patch: async (endpoint, body = {}, options = {}) => {
@@ -163,7 +171,7 @@ export const apiClient = {
       credentials: "include",
       ...options,
     });
-    return handleResponse(response);
+    return handleResponse(response, endpoint);
   },
 
   delete: async (endpoint, body = null, options = {}) => {
@@ -186,7 +194,7 @@ export const apiClient = {
     }
 
     const response = await fetch(url, fetchOptions);
-    return handleResponse(response);
+    return handleResponse(response, endpoint);
   },
 };
 
@@ -199,7 +207,7 @@ async function accountsRequest(path, { method = "GET", body, signal } = {}, muta
     if (result.status === 204) return null;
     return handleResponse(new Response(JSON.stringify(result.data), {
       status: result.status, headers: { "Content-Type": "application/json" },
-    }));
+    }), path);
   }
   if (body !== undefined) headers["Content-Type"] = "application/json";
   let response;
@@ -213,7 +221,7 @@ async function accountsRequest(path, { method = "GET", body, signal } = {}, muta
     throw new Error("No se pudo conectar con el servidor. Revisa tu conexión e intenta nuevamente.");
   }
   if (response.status === 204) return null;
-  return handleResponse(response);
+  return handleResponse(response, `/api/accounts/${path}`);
 }
 
 export function hasAccountPermission(user, action) {
