@@ -22,7 +22,7 @@ export default function AdministrativeUserForm({ userId }) {
   const [refresh, setRefresh] = useState(0);
   const [createdUser, setCreatedUser] = useState(null);
   const [originalUser, setOriginalUser] = useState(null);
-  const [form, setForm] = useState({ collegue_code: "", full_name: "", email: "" });
+  const [form, setForm] = useState({ collegue_code: "", full_name: "", email: "", is_active: "true" });
 
   useEffect(() => {
     const controller = new AbortController();
@@ -44,7 +44,7 @@ export default function AdministrativeUserForm({ userId }) {
           const user = await getUser(userId, controller.signal);
           if (controller.signal.aborted) return;
           setOriginalUser(user);
-          setForm({ collegue_code: user.collegue_code || "", full_name: user.full_name || "", email: user.email || "" });
+          setForm({ collegue_code: user.collegue_code || "", full_name: user.full_name || "", email: user.email || "", is_active: String(user.is_active !== false) });
         }
       } catch (error) {
         if (controller.signal.aborted) return;
@@ -70,7 +70,7 @@ export default function AdministrativeUserForm({ userId }) {
     setError(null);
     try {
       const body = {
-        ...(!editing && { email: form.email.trim() }), full_name: form.full_name.trim(), collegue_code: form.collegue_code.trim(),
+        ...(editing ? { is_active: form.is_active === "true" } : { email: form.email.trim() }), full_name: form.full_name.trim(), collegue_code: form.collegue_code.trim(),
       };
       const user = editing ? await accountsApi.updateUser(userId, body) : await accountsApi.invite(body);
       setCreatedUser(editing ? { ...originalUser, ...body, ...user } : user);
@@ -103,6 +103,12 @@ export default function AdministrativeUserForm({ userId }) {
             <FormField compact id="user-email" label={editing ? "Correo institucional" : "Correo institucional *"} name="email" type="email" autoComplete="email" required={!editing} disabled={editing} placeholder="usuario@ufps.edu.co" value={form.email} onChange={update} />
           </div>
         </fieldset>
+        {editing && <fieldset disabled={loading || busy || !canSubmit}>
+          <legend className="mb-2 text-base font-semibold">Acceso</legend>
+          <div className="grid gap-3 md:grid-cols-3">
+            <FormField compact id="user-status" label="Estado" name="is_active" value={form.is_active} onChange={update} options={[{ value: "true", label: "Activo" }, { value: "false", label: "Inactivo" }]} />
+          </div>
+        </fieldset>}
         {editing && originalUser && hasAccountPermission(viewer, "manage_permissions") && <div>
           <h2 className="text-base font-semibold">Permisos individuales</h2>
           <p className="mt-2 text-xs text-[#6B758A]">Los permisos se configuran por usuario. Los cambios de datos y accesos quedarán registrados en la bitácora.</p>
