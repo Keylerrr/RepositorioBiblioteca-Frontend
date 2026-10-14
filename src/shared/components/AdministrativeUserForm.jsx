@@ -103,12 +103,11 @@ export default function AdministrativeUserForm({ userId }) {
             <FormField compact id="user-email" label="Correo institucional *" name="email" type="email" autoComplete="email" required placeholder="usuario@ufps.edu.co" value={form.email} onChange={update} />
           </div>
         </fieldset>
-        <div>
+        {editing && originalUser && hasAccountPermission(viewer, "manage_permissions") && <div>
           <h2 className="text-base font-semibold">Permisos individuales</h2>
-          <p className="mt-2 text-xs text-[#6B758A]">{editing ? "Los permisos se configuran por usuario. Los cambios de datos y accesos quedarán registrados en la bitácora." : "Los permisos se asignan por usuario y podrán configurarse después del alta. La cuenta se crea sin permisos."}</p>
-          {editing && originalUser && !busy && hasAccountPermission(viewer, "manage_permissions") ? <Button variant="outline" className={`${outline} mt-4`} href={`/admin/usuarios?vista=permisos&usuario=${encodeURIComponent(userId)}`}>Configurar permisos</Button> : <Button variant="outline" className={`${outline} mt-4`} disabled aria-describedby={editing ? undefined : "permissions-after-create"}>Configurar permisos</Button>}
-          {!editing && <p id="permissions-after-create" className="mt-2 text-xs text-[#6B758A]">Disponible después de crear el usuario, si tienes autorización para configurar permisos.</p>}
-        </div>
+          <p className="mt-2 text-xs text-[#6B758A]">Los permisos se configuran por usuario. Los cambios de datos y accesos quedarán registrados en la bitácora.</p>
+          <Button variant="outline" className={`${outline} mt-4`} href={`/admin/usuarios?vista=permisos&usuario=${encodeURIComponent(userId)}`}>Configurar permisos</Button>
+        </div>}
         <div className="flex flex-wrap justify-end gap-3 pt-2">
           <Button href="/admin/usuarios" variant="outline" className={outline}>Cancelar</Button>
           <Button type="submit" className={`${primary} min-w-40`} disabled={loading || busy || !canSubmit}>{busy ? editing ? "Guardando cambios…" : "Creando usuario…" : editing ? "Guardar cambios" : "Crear usuario"}</Button>
