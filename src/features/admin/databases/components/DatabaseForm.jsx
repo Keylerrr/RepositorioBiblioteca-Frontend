@@ -622,7 +622,7 @@ export default function DatabaseForm({ initialData = null, isEdit = false }) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-2xs space-y-1">
             <Label htmlFor="start_period" className="text-[11px] font-medium text-gray-500 block">
-              Periodo inicio *
+              Fecha de incorporación *
             </Label>
             <Input
               id="start_period"
@@ -635,7 +635,7 @@ export default function DatabaseForm({ initialData = null, isEdit = false }) {
 
           <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-2xs space-y-1">
             <Label htmlFor="finish_period" className="text-[11px] font-medium text-gray-500 block">
-              Periodo fin (Opcional)
+              Fecha de desvinculación (opcional)
             </Label>
             <Input
               id="finish_period"
