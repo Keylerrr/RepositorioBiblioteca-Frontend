@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiClient } from "@/shared/services/apiClient";
 import { clampPage, sanitizePageValue } from "@/shared/utils/pagination";
+import AuditChangeDetails, { summarizeAuditValue } from "./AuditChangeDetails";
 
 /* ───────────── Cliente del API de auditoría (solo lectura) ───────────── */
 const AUDIT = "/api/audit/logs";
@@ -28,9 +29,7 @@ const pairOf = (v) => (Array.isArray(v) ? v : ["", v]);
 
 function fmtVal(v) {
   if (v === "" || v == null) return "—";
-  if (typeof v === "boolean") return v ? "Sí" : "No";
-  if (typeof v === "object") return JSON.stringify(v);
-  return String(v);
+  return summarizeAuditValue(v);
 }
 
 function actionMeta(log) {
@@ -176,7 +175,6 @@ function DetailDrawer({ row, onClose, onHistory }) {
 
   const log = detail ?? row; // se muestra lo del listado mientras llega el detalle
   const meta = actionMeta(log);
-  const changes = Object.entries(log.changes ?? {});
   const actor = detail?.actor_detail;
 
   return (
@@ -190,12 +188,13 @@ function DetailDrawer({ row, onClose, onHistory }) {
         )}
 
         <dl className="space-y-3">
+          <Field name="Número del registro">#{log.id}</Field>
           <Field name="Fecha y hora">{fmtDate(log.timestamp, true)}</Field>
           <Field name="Acción"><span className={`font-semibold ${meta.cls}`}>{meta.text}</span></Field>
           <Field name="Entidad">{label(log.resource_display || log.resource)}</Field>
           <Field name="ID del objeto">#{log.object_id}</Field>
           <Field name="Objeto">{log.object_repr || "—"}</Field>
-          <Field name="Responsable">
+          <Field name="Administrador responsable">
             {log.actor_name ? (
               <>
                 {log.actor_name}
@@ -219,45 +218,13 @@ function DetailDrawer({ row, onClose, onHistory }) {
           )}
         </dl>
 
-        <section aria-labelledby="cambios-title">
-          <h3 id="cambios-title" className="text-sm font-semibold">Cambios</h3>
-          {changes.length ? (
-            <div className="mt-2 overflow-x-auto rounded-md border border-slate-200">
-              <table className="w-full min-w-[420px] text-left text-sm">
-                <thead className="bg-slate-100 text-xs font-semibold text-slate-700">
-                  <tr>
-                    <th scope="col" className="px-3 py-2">Campo</th>
-                    <th scope="col" className="px-3 py-2">Antes</th>
-                    <th scope="col" className="px-3 py-2">Después</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {changes.map(([field, value]) => {
-                    const [before, after] = pairOf(value);
-                    return (
-                      <tr key={field}>
-                        <th scope="row" className="px-3 py-2 align-top font-medium">{field}</th>
-                        <td className="break-words px-3 py-2 align-top text-slate-600">{fmtVal(before)}</td>
-                        <td className="break-words px-3 py-2 align-top">{fmtVal(after)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <p className="mt-2 text-sm text-slate-600">{detail?.changes_text || "Sin cambios registrados."}</p>
-          )}
-        </section>
-
-        {detail?.additional_data != null && (
-          <section aria-labelledby="extra-title">
-            <h3 id="extra-title" className="text-sm font-semibold">Datos adicionales</h3>
-            <pre className="mt-2 overflow-x-auto rounded-md bg-slate-100 p-3 text-xs text-slate-800">
-              {JSON.stringify(detail.additional_data, null, 2)}
-            </pre>
-          </section>
-        )}
+        <AuditChangeDetails
+          changes={log.changes}
+          action={log.is_soft_delete ? "archive" : log.is_restore ? "restore" : log.action_name}
+          objectLabel={log.object_repr}
+          additionalData={detail?.additional_data}
+          changesText={detail?.changes_text}
+        />
       </div>
 
       <div className="flex flex-wrap gap-3 border-t border-slate-200 px-6 py-4">
