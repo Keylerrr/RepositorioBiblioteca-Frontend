@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { Open_Sans } from "next/font/google";
 import Button from "@/shared/components/Button";
 import AccountFeedback from "@/shared/components/AccountFeedback";
 import { useAccountsApi } from "@/shared/components/AccountsProvider";
@@ -9,11 +10,12 @@ import { hasAccountPermission } from "@/shared/services/apiClient";
 import { getUserDisplayName } from "@/shared/services/userService";
 
 const outlineStyle = "!border-[#C8102E] !text-[#C8102E]";
+const openSans = Open_Sans({ subsets: ["latin"], weight: ["400", "600", "700"], display: "swap" });
 
 function deletionDate(value) {
   if (!value) return "—";
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleDateString("es-CO", { day: "2-digit", month: "short", year: "numeric" });
+  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleDateString("es-CO", { day: "2-digit", month: "short", year: "numeric" }).replaceAll(" de ", " ").replace("sept", "sep");
 }
 
 export default function ArchivedAdministrativeUsers({ overview = false }) {
@@ -90,7 +92,7 @@ export default function ArchivedAdministrativeUsers({ overview = false }) {
   const count = !loading && !error && <span className="inline-flex h-[34px] min-w-[159px] items-center justify-center rounded-full bg-[#FFF0F2] px-[18px] text-[13px] font-semibold text-[#C8102E]" aria-live="polite">{users.length} {users.length === 1 ? "eliminado" : "eliminados"}</span>;
 
   if (overview) return (
-    <section className="text-[#1F242E]">
+    <section className={`${openSans.className} text-[#1F242E]`}>
       <p className="text-xs font-semibold text-[#C8102E]">ADMINISTRACIÓN · GOBIERNO</p>
       <header className="mt-2 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-[32px] leading-[48px] font-bold">Papelera</h1>
@@ -112,7 +114,7 @@ export default function ArchivedAdministrativeUsers({ overview = false }) {
   );
 
   return (
-    <section className="text-[#1F242E]">
+    <section className={`${openSans.className} text-[#1F242E]`}>
       <Link href="/admin/papelera" className="inline-flex h-[30px] items-center text-sm font-semibold text-[#C8102E] hover:underline">← Volver a Papelera</Link>
       <h1 className="mt-3 text-[30px] leading-[48px] font-bold">Papelera · Usuarios administrativos</h1>
       <p className="mt-[3px] text-[15px] leading-6 text-[#68707C]">Cuentas retiradas del acceso a administración.</p>
