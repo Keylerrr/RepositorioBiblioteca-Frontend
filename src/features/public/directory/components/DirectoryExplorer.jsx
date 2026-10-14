@@ -6,6 +6,7 @@ import ResourceCard from "@/features/public/directory/components/ResourceCard";
 import SearchBar from "@/features/public/directory/components/SearchBar";
 import { getPage as getDatabasesPage } from "@/shared/services/databaseService";
 import { getPage as getJournalsPage } from "@/shared/services/journalService";
+import { clampPage, sanitizePageValue } from "@/shared/utils/pagination";
 
 const emptyFilters = { knowledge_area: "", language: "", country: "", material_type: "", academic_program: "" };
 const pageSize = 10;
@@ -17,6 +18,7 @@ export default function DirectoryExplorer({ initialQuery = "", initialType = "da
   const [query, setQuery] = useState(initialQuery);
   const [filters, setFilters] = useState(emptyFilters);
   const [page, setPage] = useState(1);
+  const [pageInput, setPageInput] = useState("1");
   const [resources, setResources] = useState([]);
   const [pagination, setPagination] = useState(emptyPagination);
   const [loading, setLoading] = useState(true);
@@ -48,6 +50,7 @@ export default function DirectoryExplorer({ initialQuery = "", initialType = "da
     setLoading(true);
     setError("");
     setFilters((current) => ({ ...current, [key]: value }));
+    setPageInput("1");
     setPage(1);
   }
 
@@ -57,6 +60,7 @@ export default function DirectoryExplorer({ initialQuery = "", initialType = "da
     setError("");
     setActiveType(type);
     setFilters(emptyFilters);
+    setPageInput("1");
     setPage(1);
   }
 
@@ -65,20 +69,39 @@ export default function DirectoryExplorer({ initialQuery = "", initialType = "da
     setLoading(true);
     setError("");
     setQuery(searchInput.trim());
+    setPageInput("1");
     setPage(1);
     setRetryCount((current) => current + 1);
   }
 
   function changePage(nextPage) {
+    const safePage = clampPage(nextPage, Math.max(1, pagination.total_pages));
     setLoading(true);
     setError("");
-    setPage(nextPage);
+    setPage(safePage);
+    setPageInput(String(safePage));
+  }
+
+  function submitPageNumber() {
+    const result = sanitizePageValue(pageInput, Math.max(1, pagination.total_pages));
+    if (!result.valid) {
+      setPageInput(String(clampPage(page, Math.max(1, pagination.total_pages))));
+      return;
+    }
+    const nextPage = result.page;
+    if (nextPage !== page) {
+      setLoading(true);
+      setError("");
+      setPage(nextPage);
+    }
+    setPageInput(String(nextPage));
   }
 
   function clearFilters() {
     setLoading(true);
     setError("");
     setFilters(emptyFilters);
+    setPageInput("1");
     setPage(1);
     setRetryCount((current) => current + 1);
   }
@@ -130,7 +153,26 @@ export default function DirectoryExplorer({ initialQuery = "", initialType = "da
         {!loading && !error && pagination.total_items > 0 && (
           <nav aria-label="Paginación" className="mt-8 flex items-center justify-center gap-4">
             <button className="min-h-10 rounded-md border border-[#e2dcd7] px-4 text-sm font-semibold text-[#5c5252] transition hover:border-[#c9a45c] hover:text-[#7f1218] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#a3141c] disabled:cursor-not-allowed disabled:opacity-40" disabled={!pagination.previous || loading} onClick={() => changePage(pagination.current_page - 1)} type="button">← Anterior</button>
-            <span className="text-sm text-[#5c5252]">Página {pagination.current_page} de {pagination.total_pages}</span>
+            <label className="flex items-center gap-2 text-sm text-[#5c5252]">
+              <span>Página</span>
+              <input
+                aria-label="Número de página actual"
+                type="number"
+                min={1}
+                max={pagination.total_pages}
+                value={pageInput}
+                onChange={(event) => setPageInput(event.target.value)}
+                onBlur={() => setPageInput(String(clampPage(page, Math.max(1, pagination.total_pages))))}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    submitPageNumber();
+                  }
+                }}
+                className="w-14 rounded-md border border-[#e2dcd7] bg-white px-2 py-1 text-center text-sm font-semibold text-[#1f1a1a] outline-none focus:border-[#a3141c]"
+              />
+              <span>de {pagination.total_pages}</span>
+            </label>
             <button className="min-h-10 rounded-md border border-[#e2dcd7] px-4 text-sm font-semibold text-[#5c5252] transition hover:border-[#c9a45c] hover:text-[#7f1218] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#a3141c] disabled:cursor-not-allowed disabled:opacity-40" disabled={!pagination.next || loading} onClick={() => changePage(pagination.current_page + 1)} type="button">Siguiente →</button>
           </nav>
         )}

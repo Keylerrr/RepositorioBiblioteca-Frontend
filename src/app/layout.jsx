@@ -1,4 +1,5 @@
 import { Source_Sans_3 } from "next/font/google";
+import SessionExpiredProvider from "@/shared/components/SessionExpiredProvider";
 import "./globals.css";
 
 const sourceSans = Source_Sans_3({
@@ -15,7 +16,9 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="es" className={`${sourceSans.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <SessionExpiredProvider>{children}</SessionExpiredProvider>
+      </body>
     </html>
   );
 }

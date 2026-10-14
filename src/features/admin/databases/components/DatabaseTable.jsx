@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { platformService } from "../services/platformService";
 import { capitalizeWords } from "@/lib/utils";
+import { clampPage, sanitizePageValue } from "@/shared/utils/pagination";
 import DeleteModal from "./DeleteModal";
 import {
   Plus,
@@ -35,6 +36,7 @@ export default function DatabaseTable() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
+  const [pageInput, setPageInput] = useState("1");
 
   // Search input state with Debounce
   const [searchInput, setSearchInput] = useState("");
@@ -90,10 +92,13 @@ export default function DatabaseTable() {
         setPlatforms(data);
         setTotalItems(data.length);
         setTotalPages(1);
+        setPageInput(String(clampPage(page, 1)));
       } else if (data && Array.isArray(data.results)) {
         setPlatforms(data.results);
         setTotalItems(data.total_items || data.count || data.results.length);
-        setTotalPages(data.total_pages || Math.ceil((data.total_items || data.results.length) / (data.page_size || 10)) || 1);
+        const nextTotalPages = data.total_pages || Math.ceil((data.total_items || data.results.length) / (data.page_size || 10)) || 1;
+        setTotalPages(nextTotalPages);
+        setPageInput(String(clampPage(page, nextTotalPages)));
       } else {
         setPlatforms([]);
         setTotalItems(0);
@@ -111,6 +116,17 @@ export default function DatabaseTable() {
   useEffect(() => {
     fetchPlatforms();
   }, [fetchPlatforms]);
+
+  const handlePageSubmit = () => {
+    const result = sanitizePageValue(pageInput, totalPages);
+    if (!result.valid) {
+      setPageInput(String(clampPage(page, totalPages)));
+      return;
+    }
+    const nextPage = result.page;
+    if (nextPage !== page) setPage(nextPage);
+    setPageInput(String(nextPage));
+  };
 
   const showSuccess = (msg) => {
     setActionSuccess(msg);
@@ -500,17 +516,42 @@ export default function DatabaseTable() {
             <div className="flex items-center gap-2">
               <button
                 disabled={page <= 1}
-                onClick={() => setPage(page - 1)}
+                onClick={() => {
+                  const nextPage = clampPage(page - 1, totalPages);
+                  setPage(nextPage);
+                  setPageInput(String(nextPage));
+                }}
                 className="p-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              <span className="font-medium text-gray-700">
-                Página {page} de {totalPages}
-              </span>
+              <label className="flex items-center gap-2 font-medium text-gray-700">
+                <span>Página</span>
+                <input
+                  aria-label="Número de página actual"
+                  type="number"
+                  min={1}
+                  max={totalPages}
+                  value={pageInput}
+                  onChange={(event) => setPageInput(event.target.value)}
+                  onBlur={() => setPageInput(String(clampPage(page, totalPages)))}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      handlePageSubmit();
+                    }
+                  }}
+                  className="w-12 rounded border border-gray-200 bg-white px-1 py-1 text-center text-xs font-medium text-gray-800 outline-none focus:border-[#C8102E]"
+                />
+                <span>de {totalPages}</span>
+              </label>
               <button
                 disabled={page >= totalPages}
-                onClick={() => setPage(page + 1)}
+                onClick={() => {
+                  const nextPage = clampPage(page + 1, totalPages);
+                  setPage(nextPage);
+                  setPageInput(String(nextPage));
+                }}
                 className="p-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
               >
                 <ChevronRight className="w-4 h-4" />

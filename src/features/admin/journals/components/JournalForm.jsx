@@ -746,7 +746,7 @@ export default function JournalForm({ initialData = null, isEdit = false }) {
                     <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-1.5">
                         <Label className="text-xs font-bold text-slate-700 uppercase tracking-wide block">
-                          Periodo inicio (opcional)
+                          Fecha de incorporación (opcional)
                         </Label>
                         <Input
                           type="date"
@@ -760,7 +760,7 @@ export default function JournalForm({ initialData = null, isEdit = false }) {
 
                       <div className="space-y-1.5">
                         <Label className="text-xs font-bold text-slate-700 uppercase tracking-wide block">
-                          Periodo fin (opcional)
+                          Fecha de desvinculación (opcional)
                         </Label>
                         <Input
                           type="date"

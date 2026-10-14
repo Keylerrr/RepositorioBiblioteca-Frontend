@@ -1,3 +1,5 @@
+import { notifySessionExpired, shouldSkipSessionExpiredAlert } from "@/shared/utils/sessionExpiration";
+
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, "");
 
 export class PublicApiError extends Error {
@@ -43,7 +45,10 @@ export async function fetchPublicApi(path, params = {}, signal) {
     } catch {
       // The response may not contain a JSON error body.
     }
-    throw new PublicApiError(message, response.status);
+  if (response.status === 401 && !shouldSkipSessionExpiredAlert(path)) {
+    notifySessionExpired(message, { endpoint: path, status: response.status });
+  }
+  throw new PublicApiError(message, response.status);
   }
 
   try {

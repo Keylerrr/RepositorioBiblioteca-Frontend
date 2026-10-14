@@ -1,3 +1,5 @@
+import { notifySessionExpired, shouldSkipSessionExpiredAlert } from "@/shared/utils/sessionExpiration";
+
 export const MAX_HARVEST_LIMIT = 2147483647;
 export const IMMEDIATE_HARVEST_ENABLED = false;
 
@@ -37,7 +39,13 @@ async function request(path, { method = "GET", body, signal, timeoutMs = 30000, 
   // Server Action that forwards the session and obtains the backend CSRF token.
   if (method !== "GET") {
     const { status, data } = await mutateAction(path, method, body);
-    if (status < 200 || status >= 300) throw new ApiError(errorMessage(data, status), status, data);
+    if (status < 200 || status >= 300) {
+      const message = errorMessage(data, status);
+      if (status === 401 && !shouldSkipSessionExpiredAlert(path)) {
+        notifySessionExpired(message, { endpoint: path, status });
+      }
+      throw new ApiError(message, status, data);
+    }
     if (!expectJson) return;
     if (data === null) throw new Error("La API devolvió una respuesta que no se pudo leer.");
     return data;
@@ -58,7 +66,13 @@ async function request(path, { method = "GET", body, signal, timeoutMs = 30000, 
     });
     if (response.ok && !expectJson) return;
     const payload = await response.json().catch(() => null);
-    if (!response.ok) throw new ApiError(errorMessage(payload, response.status), response.status, payload);
+    if (!response.ok) {
+      const message = errorMessage(payload, response.status);
+      if (response.status === 401 && !shouldSkipSessionExpiredAlert(path)) {
+        notifySessionExpired(message, { endpoint: path, status: response.status });
+      }
+      throw new ApiError(message, response.status, payload);
+    }
     if (payload === null) throw new Error("La API devolvió una respuesta que no se pudo leer.");
     return payload;
   } catch (error) {
