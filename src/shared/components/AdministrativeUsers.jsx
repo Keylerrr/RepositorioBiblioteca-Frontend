@@ -132,7 +132,7 @@ export default function AdministrativeUsers() {
                   <td className="px-2.5">{user.created_by?.full_name || (typeof user.created_by === "string" ? user.created_by : "—")}</td>
                   <td className={`px-2.5 font-semibold ${user.is_active ? "text-[#1F8C52]" : "text-[#6B758A]"}`}>{user.is_active ? "Activo" : "Inactivo"}</td>
                   <td className="px-1"><div className="flex gap-1.5">
-                    {hasAccountPermission(viewer, "edit") && <Button size="small" variant="outline" href={`/admin/usuarios?vista=editar&usuario=${encodeURIComponent(user.id)}`} className={buttonStyle} aria-label={`Editar a ${user.full_name || user.email}`}>Editar</Button>}
+                    {hasAccountPermission(viewer, "update") && <Button size="small" variant="outline" href={`/admin/usuarios?vista=editar&usuario=${encodeURIComponent(user.id)}`} className={buttonStyle} aria-label={`Editar a ${user.full_name || user.email}`}>Editar</Button>}
                     <Button size="small" variant="outline" href={`/admin/usuarios?vista=permisos&usuario=${encodeURIComponent(user.id)}`} className={buttonStyle}>Permisos</Button>
                     {hasAccountPermission(viewer, "delete") && <Button size="sm" className={primaryStyle} disabled={user.is_superadmin || !user.is_active} onClick={() => setSelected(user)} aria-label={`Eliminar a ${user.full_name || user.email}`}>Eliminar</Button>}
                   </div></td>

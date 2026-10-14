@@ -22,7 +22,7 @@ export default function AdministrativeUserForm({ userId }) {
   const [refresh, setRefresh] = useState(0);
   const [createdUser, setCreatedUser] = useState(null);
   const [originalUser, setOriginalUser] = useState(null);
-  const [form, setForm] = useState({ collegue_code: "", full_name: "", email: "" });
+  const [form, setForm] = useState({ collegue_code: "", full_name: "", email: "", is_active: "true" });
 
   useEffect(() => {
     const controller = new AbortController();
@@ -38,13 +38,13 @@ export default function AdministrativeUserForm({ userId }) {
         authenticated = true;
         if (current.force_password_change) throw new Error("Debes cambiar tu contraseña provisional desde el inicio de sesión.");
         setViewer(current);
-        if (!hasAccountPermission(current, editing ? "edit" : "invite")) throw new Error(`Tu cuenta no tiene autorización para ${editing ? "editar" : "crear"} usuarios administrativos.`);
+        if (!hasAccountPermission(current, editing ? "update" : "invite")) throw new Error(`Tu cuenta no tiene autorización para ${editing ? "editar" : "crear"} usuarios administrativos.`);
         if (editing) {
           if (!hasAccountPermission(current, "view")) throw new Error("Tu cuenta no tiene permiso para consultar usuarios administrativos.");
           const user = await getUser(userId, controller.signal);
           if (controller.signal.aborted) return;
           setOriginalUser(user);
-          setForm({ collegue_code: user.collegue_code || "", full_name: user.full_name || "", email: user.email || "" });
+          setForm({ collegue_code: user.collegue_code || "", full_name: user.full_name || "", email: user.email || "", is_active: String(user.is_active !== false) });
         }
       } catch (error) {
         if (controller.signal.aborted) return;
@@ -58,7 +58,7 @@ export default function AdministrativeUserForm({ userId }) {
     return () => controller.abort();
   }, [getViewer, getUser, editing, userId, refresh]);
 
-  const canSubmit = hasAccountPermission(viewer, editing ? "edit" : "invite") && (!editing || Boolean(originalUser));
+  const canSubmit = hasAccountPermission(viewer, editing ? "update" : "invite") && (!editing || Boolean(originalUser));
   function update(event) {
     setForm((current) => ({ ...current, [event.target.name]: event.target.value }));
   }
@@ -70,7 +70,7 @@ export default function AdministrativeUserForm({ userId }) {
     setError(null);
     try {
       const body = {
-        email: form.email.trim(), full_name: form.full_name.trim(), collegue_code: form.collegue_code.trim(),
+        ...(editing ? { is_active: form.is_active === "true" } : { email: form.email.trim() }), full_name: form.full_name.trim(), collegue_code: form.collegue_code.trim(),
       };
       const user = editing ? await accountsApi.updateUser(userId, body) : await accountsApi.invite(body);
       setCreatedUser(editing ? { ...originalUser, ...body, ...user } : user);
@@ -100,35 +100,20 @@ export default function AdministrativeUserForm({ userId }) {
           <div className="grid gap-3 md:grid-cols-3">
             <FormField compact id="user-code" label="Código institucional" name="collegue_code" placeholder="Ej. 10584" value={form.collegue_code} onChange={update} />
             <FormField compact id="user-name" label="Nombre completo" name="full_name" autoComplete="name" placeholder="Nombres y apellidos" value={form.full_name} onChange={update} />
-            <FormField compact id="user-document" label="Documento de identidad" disabled placeholder="No disponible" aria-describedby="unsupported-fields" />
-            <FormField compact id="user-email" label="Correo institucional *" name="email" type="email" autoComplete="email" required placeholder="usuario@ufps.edu.co" value={form.email} onChange={update} />
-            <FormField compact id="user-department" label="Cargo o dependencia" disabled placeholder="No disponible" aria-describedby="unsupported-fields" />
-            <FormField compact id="user-phone" label="Teléfono" disabled placeholder="No disponible" aria-describedby="unsupported-fields" />
+            <FormField compact id="user-email" label={editing ? "Correo institucional" : "Correo institucional *"} name="email" type="email" autoComplete="email" required={!editing} disabled={editing} placeholder="usuario@ufps.edu.co" value={form.email} onChange={update} />
           </div>
-          <p id="unsupported-fields" className="mt-2 text-xs text-[#6B758A]">El registro de cuentas admite correo, nombre y código. Documento, dependencia y teléfono aún no están disponibles.</p>
         </fieldset>
-        <fieldset>
+        {editing && <fieldset disabled={loading || busy || !canSubmit}>
           <legend className="mb-2 text-base font-semibold">Acceso</legend>
           <div className="grid gap-3 md:grid-cols-3">
-            <FormField compact id="user-password" label={editing ? "Nueva contraseña (opcional)" : "Contraseña provisional"} value={editing ? "Se conserva la contraseña actual" : "Se genera y envía por correo"} readOnly />
-            <FormField compact id="user-initial-status" label={editing ? "Estado" : "Estado inicial"} value={editing ? originalUser ? originalUser.is_active ? "Activo" : "Inactivo" : "—" : "Activo"} readOnly />
-            <FormField compact id="user-notification" label={editing ? "Notificar cambios por correo" : "Notificar por correo"} value={editing ? "No disponible" : "Sí, al crear la cuenta"} readOnly />
+            <FormField compact id="user-status" label="Estado" name="is_active" value={form.is_active} onChange={update} options={[{ value: "true", label: "Activo" }, { value: "false", label: "Inactivo" }]} />
           </div>
-          {editing && <p className="mt-2 text-xs text-[#6B758A]">Desde este formulario se actualizan los datos personales. La contraseña y el estado se conservan; las notificaciones de cambios aún no están disponibles.</p>}
-        </fieldset>
-        <fieldset>
-          <legend className="mb-2 text-base font-semibold">Trazabilidad</legend>
-          <div className="grid gap-3 md:grid-cols-3">
-            <FormField compact id="user-creator" label="Creado por" value={editing ? originalUser?.created_by?.full_name || (typeof originalUser?.created_by === "string" ? originalUser.created_by : "—") : viewer?.full_name || viewer?.email || "Administrador actual"} readOnly />
-            <FormField compact id="user-created-at" label="Fecha de creación" value={editing ? originalUser?.created_at ? new Date(originalUser.created_at).toLocaleDateString("es-CO", { day: "2-digit", month: "short", year: "numeric" }) : "—" : "Se asignará al guardar"} readOnly />
-          </div>
-        </fieldset>
-        <div>
+        </fieldset>}
+        {editing && originalUser && hasAccountPermission(viewer, "manage_permissions") && <div>
           <h2 className="text-base font-semibold">Permisos individuales</h2>
-          <p className="mt-2 text-xs text-[#6B758A]">{editing ? "Los permisos se configuran por usuario. Los cambios de datos y accesos quedarán registrados en la bitácora." : "Los permisos se asignan por usuario y podrán configurarse después del alta. La cuenta se crea sin permisos."}</p>
-          {editing && originalUser && !busy && hasAccountPermission(viewer, "manage_permissions") ? <Button variant="outline" className={`${outline} mt-4`} href={`/admin/usuarios?vista=permisos&usuario=${encodeURIComponent(userId)}`}>Configurar permisos</Button> : <Button variant="outline" className={`${outline} mt-4`} disabled aria-describedby={editing ? undefined : "permissions-after-create"}>Configurar permisos</Button>}
-          {!editing && <p id="permissions-after-create" className="mt-2 text-xs text-[#6B758A]">Disponible después de crear el usuario, si tienes autorización para configurar permisos.</p>}
-        </div>
+          <p className="mt-2 text-xs text-[#6B758A]">Los permisos se configuran por usuario. Los cambios de datos y accesos quedarán registrados en la bitácora.</p>
+          <Button variant="outline" className={`${outline} mt-4`} href={`/admin/usuarios?vista=permisos&usuario=${encodeURIComponent(userId)}`}>Configurar permisos</Button>
+        </div>}
         <div className="flex flex-wrap justify-end gap-3 pt-2">
           <Button href="/admin/usuarios" variant="outline" className={outline}>Cancelar</Button>
           <Button type="submit" className={`${primary} min-w-40`} disabled={loading || busy || !canSubmit}>{busy ? editing ? "Guardando cambios…" : "Creando usuario…" : editing ? "Guardar cambios" : "Crear usuario"}</Button>
