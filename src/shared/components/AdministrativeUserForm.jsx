@@ -100,12 +100,8 @@ export default function AdministrativeUserForm({ userId }) {
           <div className="grid gap-3 md:grid-cols-3">
             <FormField compact id="user-code" label="Código institucional" name="collegue_code" placeholder="Ej. 10584" value={form.collegue_code} onChange={update} />
             <FormField compact id="user-name" label="Nombre completo" name="full_name" autoComplete="name" placeholder="Nombres y apellidos" value={form.full_name} onChange={update} />
-            <FormField compact id="user-document" label="Documento de identidad" disabled placeholder="No disponible" aria-describedby="unsupported-fields" />
             <FormField compact id="user-email" label="Correo institucional *" name="email" type="email" autoComplete="email" required placeholder="usuario@ufps.edu.co" value={form.email} onChange={update} />
-            <FormField compact id="user-department" label="Cargo o dependencia" disabled placeholder="No disponible" aria-describedby="unsupported-fields" />
-            <FormField compact id="user-phone" label="Teléfono" disabled placeholder="No disponible" aria-describedby="unsupported-fields" />
           </div>
-          <p id="unsupported-fields" className="mt-2 text-xs text-[#6B758A]">El registro de cuentas admite correo, nombre y código. Documento, dependencia y teléfono aún no están disponibles.</p>
         </fieldset>
         <fieldset>
           <legend className="mb-2 text-base font-semibold">Acceso</legend>
