@@ -40,8 +40,6 @@ function emptyPlatformRow() {
     _key: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     platform: "",
     journal_url: "",
-    start_period: "",
-    finish_period: "",
     has_full_text: true,
   };
 }
@@ -238,8 +236,6 @@ export default function JournalForm({ initialData = null, isEdit = false }) {
         platforms: formData.platforms.map((row) => ({
           platform: Number(row.platform),
           journal_url: row.journal_url.trim(),
-          start_period: row.start_period || null,
-          finish_period: row.finish_period || null,
           has_full_text: Boolean(row.has_full_text),
         })),
       };
@@ -742,36 +738,27 @@ export default function JournalForm({ initialData = null, isEdit = false }) {
                       </div>
                     )}
 
-                    {/* Cobertura en la plataforma */}
-                    <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
-                        <Label className="text-xs font-bold text-slate-700 uppercase tracking-wide block">
-                          Fecha de incorporación (opcional)
-                        </Label>
-                        <Input
-                          type="date"
-                          value={row.start_period || ""}
-                          onChange={(e) =>
-                            updatePlatformRow(index, { start_period: e.target.value })
-                          }
-                          className={platformFieldClass}
-                        />
+                    {/* Fechas de vinculación administradas por el backend (solo edición). */}
+                    {isEdit && (row.start_period || row.finish_period) && (
+                      <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs font-bold text-slate-700 uppercase tracking-wide block">
+                            Fecha de vinculación con la plataforma
+                          </Label>
+                          <p className={`${platformFieldClass} flex items-center bg-slate-100 text-slate-600`}>
+                            {row.start_period || "Sin definir"}
+                          </p>
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs font-bold text-slate-700 uppercase tracking-wide block">
+                            Fecha de finalización de la vinculación
+                          </Label>
+                          <p className={`${platformFieldClass} flex items-center bg-slate-100 text-slate-600`}>
+                            {row.finish_period || "Indefinida"}
+                          </p>
+                        </div>
                       </div>
-
-                      <div className="space-y-1.5">
-                        <Label className="text-xs font-bold text-slate-700 uppercase tracking-wide block">
-                          Fecha de desvinculación (opcional)
-                        </Label>
-                        <Input
-                          type="date"
-                          value={row.finish_period || ""}
-                          onChange={(e) =>
-                            updatePlatformRow(index, { finish_period: e.target.value })
-                          }
-                          className={platformFieldClass}
-                        />
-                      </div>
-                    </div>
+                    )}
 
                     {/* Texto completo */}
                     <div className="space-y-1.5 md:col-span-2">

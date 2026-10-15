@@ -409,17 +409,17 @@ export default function DatabaseDetail({ platformId }) {
                   </div>
                 </div>
 
-                {/* Periodo Inicial */}
+                {/* Fecha de registro administrada por el backend */}
                 <div>
-                  <span className="text-xs uppercase tracking-wide text-gray-500 font-semibold block">Periodo Inicial</span>
+                  <span className="text-xs uppercase tracking-wide text-gray-500 font-semibold block">Fecha de registro de la plataforma</span>
                   <div className="mt-1.5 p-2.5 bg-slate-50 border border-slate-100 rounded-lg">
                     <span className="text-[14px] sm:text-[15px] font-semibold text-slate-900">{platform.start_period || "Sin definir"}</span>
                   </div>
                 </div>
 
-                {/* Periodo Final */}
+                {/* Fecha de obsolescencia administrada por el backend */}
                 <div>
-                  <span className="text-xs uppercase tracking-wide text-gray-500 font-semibold block">Periodo Final</span>
+                  <span className="text-xs uppercase tracking-wide text-gray-500 font-semibold block">Fecha de obsolescencia</span>
                   <div className="mt-1.5 p-2.5 bg-slate-50 border border-slate-100 rounded-lg">
                     <span className="text-[14px] sm:text-[15px] font-semibold text-slate-900">{platform.finish_period || "Indefinido"}</span>
                   </div>

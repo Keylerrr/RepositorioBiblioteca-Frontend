@@ -337,9 +337,9 @@ export default function DatabaseTable() {
             className="w-full text-xs text-gray-700 outline-none bg-transparent cursor-pointer font-medium"
           >
             <option value="all">Todos los estados ▾</option>
-            <option value="BORRADOR">Pendientes (Borrador)</option>
-            <option value="PUBLICADO">Publicados</option>
-            <option value="OBSOLETO">Obsoletos</option>
+            <option value="borrador">Pendientes (Borrador)</option>
+            <option value="publicado">Publicados</option>
+            <option value="obsoleto">Obsoletos</option>
             <option value="archived">Archivadas (Eliminadas)</option>
           </select>
         </div>

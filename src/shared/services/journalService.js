@@ -16,11 +16,6 @@ function displayNames(items) {
   return names.length ? names.join(", ") : "No especificado";
 }
 
-function formatPeriod(start, finish) {
-  if (!start && !finish) return "No especificado";
-  return `${start ?? "Inicio no especificado"} – ${finish ?? "Actualidad"}`;
-}
-
 function mapJournal(journal) {
   const languages = capitalizeNamedItems(journal.languages);
   const countries = capitalizeNamedItems(journal.countries);
@@ -47,7 +42,7 @@ function mapJournal(journal) {
     access_label: "Abrir sitio oficial",
     geographic_coverage: displayNames(countries),
     language: displayNames(languages),
-    coverage_period: formatPeriod(journal.start_period, journal.finish_period),
+    coverage_period: journal.publication_date ?? "No especificado",
     material_type: displayNames(materialTypes),
     license: journal.license,
     identifiers: journal.issn ? [{ identifier_type: "ISSN", identifier_value: journal.issn }] : [],

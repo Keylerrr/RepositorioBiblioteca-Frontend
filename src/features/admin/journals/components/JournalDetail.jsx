@@ -494,10 +494,18 @@ export default function JournalDetail({ journalId }) {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                           <div>
                             <span className="text-gray-500 font-semibold uppercase tracking-wide block">
-                              Cobertura en plataforma
+                              Fecha de vinculación con la plataforma
                             </span>
                             <span className="text-slate-900 font-semibold">
-                              {entry.start_period || "Sin inicio"} — {entry.finish_period || "Indefinido"}
+                              {entry.start_period || "Sin definir"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 font-semibold uppercase tracking-wide block">
+                              Fecha de finalización de la vinculación
+                            </span>
+                            <span className="text-slate-900 font-semibold">
+                              {entry.finish_period || "Indefinida"}
                             </span>
                           </div>
                         </div>

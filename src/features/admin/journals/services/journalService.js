@@ -9,6 +9,13 @@ export const journalService = {
   },
 
   /**
+   * List logically deleted journals (GET /api/journals/archived/)
+   */
+  getArchivedJournals: async () => {
+    return apiClient.get("/api/journals/archived/");
+  },
+
+  /**
    * Get detail of a specific journal
    */
   getJournalById: async (id) => {
@@ -85,8 +92,17 @@ export const journalService = {
   /**
    * Delete journal (DELETE /api/journals/{id}/)
    */
-  deleteJournal: async (id) => {
-    return apiClient.delete(`/api/journals/${id}/`);
+  deleteJournal: async (id, deleteExplanation = "") => {
+    return apiClient.delete(`/api/journals/${id}/`, {
+      delete_explanation: deleteExplanation,
+    });
+  },
+
+  /**
+   * Restore a logically deleted journal (POST /api/journals/{id}/restore/)
+   */
+  restoreJournal: async (id) => {
+    return apiClient.post(`/api/journals/${id}/restore/`, {});
   },
 
   /**
