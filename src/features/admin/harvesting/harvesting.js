@@ -114,6 +114,14 @@ export function getHarvests(page, signal) {
   return list("/api/harvesting/harvests/", { page, page_size: 10, ordering: "-created_at" }, signal);
 }
 
+export function getHarvest(id, signal) {
+  return request(`/api/harvesting/harvests/${encodeURIComponent(id)}/`, { signal });
+}
+
+export function getHarvestJournals(id, page, signal) {
+  return list(`/api/harvesting/harvests/${encodeURIComponent(id)}/journals/`, { page, page_size: 10 }, signal);
+}
+
 export function getScheduleHarvests(scheduleId, signal) {
   return listAll("/api/harvesting/harvests/", { schedule: scheduleId, ordering: "-created_at" }, signal);
 }
