@@ -2,6 +2,7 @@ import { notifySessionExpired, shouldSkipSessionExpiredAlert } from "@/shared/ut
 
 export const MAX_HARVEST_LIMIT = 2147483647;
 export const IMMEDIATE_HARVEST_ENABLED = false;
+export const HARVEST_JOURNALS_PAGE_SIZE = 10;
 
 const FIELD_NAMES = {
   platforms: "Plataformas",
@@ -119,7 +120,7 @@ export function getHarvest(id, signal) {
 }
 
 export function getHarvestJournals(id, page, signal) {
-  return list(`/api/harvesting/harvests/${encodeURIComponent(id)}/journals/`, { page, page_size: 10 }, signal);
+  return list(`/api/harvesting/harvests/${encodeURIComponent(id)}/journals/`, { page, page_size: HARVEST_JOURNALS_PAGE_SIZE }, signal);
 }
 
 export function getScheduleHarvests(scheduleId, signal) {

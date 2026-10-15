@@ -5,8 +5,9 @@ import AdminTable from "@/shared/components/AdminTable";
 import Badge from "@/shared/components/Badge";
 import Button from "@/shared/components/Button";
 import Notice from "@/shared/components/Notice";
-import { formatDate, getHarvest, getHarvestJournals } from "@/features/admin/harvesting/harvesting";
+import { formatDate, getHarvest, getHarvestJournals, HARVEST_JOURNALS_PAGE_SIZE } from "@/features/admin/harvesting/harvesting";
 import { capitalizeWords } from "@/shared/utils/formatText";
+import { clampPage, sanitizePageValue } from "@/shared/utils/pagination";
 
 const columns = [
   { key: "title", label: "REVISTA", width: "34%", render: (row) => <span className="break-words font-semibold">{capitalizeWords(row.title)}</span> },
@@ -26,6 +27,7 @@ const columns = [
 
 export default function HarvestJournals({ harvestId }) {
   const [page, setPage] = useState(1);
+  const [pageInput, setPageInput] = useState("1");
   const [revision, setRevision] = useState(0);
   const [state, setState] = useState({ harvest: null, data: null, loading: true, error: "" });
 
@@ -47,8 +49,18 @@ export default function HarvestJournals({ harvestId }) {
   }, [harvestId, page, revision]);
 
   function changePage(nextPage) {
+    const safePage = clampPage(nextPage, totalPages);
+    setPageInput(String(safePage));
+    if (loading || safePage === page) return;
     setState((current) => ({ ...current, data: null, loading: true, error: "" }));
-    setPage(nextPage);
+    setPage(safePage);
+  }
+
+  function submitPageNumber(event) {
+    event.preventDefault();
+    const result = sanitizePageValue(pageInput, totalPages);
+    if (result.valid) changePage(result.page);
+    else setPageInput(String(page));
   }
 
   function refresh() {
@@ -58,7 +70,10 @@ export default function HarvestJournals({ harvestId }) {
 
   const { harvest, data, loading, error } = state;
   const totalItems = data?.total_items ?? data?.count ?? data?.results.length ?? 0;
-  const totalPages = Math.max(1, data?.total_pages ?? Math.ceil(totalItems / 10));
+  const pageSize = data?.page_size ?? HARVEST_JOURNALS_PAGE_SIZE;
+  const totalPages = Math.max(1, data?.total_pages ?? Math.ceil(totalItems / pageSize));
+  const firstItem = data?.results.length ? (page - 1) * pageSize + 1 : 0;
+  const lastItem = data?.results.length ? firstItem + data.results.length - 1 : 0;
 
   return (
     <div className="mx-auto flex w-full max-w-[1088px] flex-col gap-5 text-sm leading-[22px] text-[#171A1F]">
@@ -82,10 +97,28 @@ export default function HarvestJournals({ harvestId }) {
           <AdminTable caption={`Revistas nuevas de la cosecha ${harvestId}`} columns={columns} rows={data.results} />
         ) : <Notice live>Esta cosecha no agregó revistas nuevas.</Notice>)}
         {data && <div className="flex flex-wrap items-center justify-between gap-3 text-[#68707C]">
-          <p>Mostrando {data.results.length} de {totalItems} revistas</p>
+          <p>Mostrando {firstItem}–{lastItem} de {totalItems} revistas</p>
           {totalPages > 1 && <nav aria-label="Paginación de revistas cosechadas" className="flex flex-wrap items-center gap-3">
             <Button variant="quiet" size="small" disabled={page <= 1} onClick={() => changePage(page - 1)}>Anterior</Button>
-            <span>Página {page} de {totalPages}</span>
+            <form onSubmit={submitPageNumber} className="flex flex-wrap items-center gap-2">
+              <label className="flex items-center gap-2">
+                <span>Página</span>
+                <input
+                  aria-label="Número de página de revistas cosechadas"
+                  type="number"
+                  min={1}
+                  max={totalPages}
+                  step={1}
+                  required
+                  value={pageInput}
+                  onChange={(event) => setPageInput(event.target.value)}
+                  onBlur={(event) => { if (!event.target.validity.valid) setPageInput(String(page)); }}
+                  className="w-20 rounded-md border border-[#DCE0E5] bg-white px-2 py-1 text-center text-sm font-semibold text-[#171A1F] outline-none focus:border-[#A90D27]"
+                />
+                <span>de {totalPages}</span>
+              </label>
+              <Button type="submit" variant="quiet" size="small">Ir</Button>
+            </form>
             <Button variant="quiet" size="small" disabled={page >= totalPages} onClick={() => changePage(page + 1)}>Siguiente</Button>
           </nav>}
         </div>}
