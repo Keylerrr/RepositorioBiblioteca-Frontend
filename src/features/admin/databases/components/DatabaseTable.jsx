@@ -183,8 +183,10 @@ export default function DatabaseTable() {
       setDeleteModalOpen(false);
       setSelectedPlatform(null);
       fetchPlatforms();
+      return true;
     } catch (err) {
       alert(`Error al eliminar: ${err.message}`);
+      return false;
     } finally {
       setIsDeleting(false);
     }

@@ -211,8 +211,10 @@ export default function JournalTable() {
       setDeleteModalOpen(false);
       setSelectedJournal(null);
       fetchJournals();
+      return true;
     } catch (err) {
       alert(`Error al eliminar: ${err.message}`);
+      return false;
     } finally {
       setIsDeleting(false);
     }

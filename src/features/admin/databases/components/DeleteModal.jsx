@@ -20,9 +20,17 @@ export default function DeleteModal({
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e) => {
+  const handleClose = () => {
+    setExplanation("");
+    onClose();
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    onConfirm(explanation);
+    const deleteExplanation = explanation.trim();
+    if (!deleteExplanation) return;
+    const deleted = await onConfirm(deleteExplanation);
+    if (deleted) setExplanation("");
   };
 
   return (
@@ -39,7 +47,7 @@ export default function DeleteModal({
             </div>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors"
           >
             <X className="w-5 h-5" />
@@ -60,6 +68,7 @@ export default function DeleteModal({
               rows={3}
               value={explanation}
               onChange={(e) => setExplanation(e.target.value)}
+              required
               placeholder={isJournal
                 ? "Ej.: Revista retirada por cese de publicación o solicitud institucional..."
                 : "Ej.: Plataforma retirada por finalización de suscripción institucional..."}
@@ -71,7 +80,7 @@ export default function DeleteModal({
             <Button
               type="button"
               variant="outline"
-              onClick={onClose}
+              onClick={handleClose}
               disabled={isDeleting}
               className="rounded-xl border-gray-200 text-gray-700 text-xs hover:bg-gray-50"
             >
@@ -79,7 +88,7 @@ export default function DeleteModal({
             </Button>
             <Button
               type="submit"
-              disabled={isDeleting}
+              disabled={isDeleting || !explanation.trim()}
               className="rounded-xl bg-[#C8102E] hover:bg-[#A50D25] text-white text-xs font-medium px-4"
             >
               {isDeleting ? "Eliminando..." : `Eliminar ${entityType}`}

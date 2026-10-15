@@ -162,8 +162,10 @@ export default function DatabaseDetail({ platformId }) {
       await platformService.deletePlatform(platformId, explanation);
       setDeleteModalOpen(false);
       router.push("/admin/bases-de-datos");
+      return true;
     } catch (err) {
       alert(`Error al eliminar: ${err.message}`);
+      return false;
     } finally {
       setIsDeleting(false);
     }

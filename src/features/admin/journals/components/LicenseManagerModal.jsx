@@ -33,6 +33,7 @@ export default function LicenseManagerModal({ isOpen, onClose, onLicensesUpdated
 
   // Delete confirmation
   const [deletingLic, setDeletingLic] = useState(null);
+  const [deleteExplanation, setDeleteExplanation] = useState("");
   const [deleting, setDeleting] = useState(false);
 
   const showSuccess = (msg) => {
@@ -123,12 +124,15 @@ export default function LicenseManagerModal({ isOpen, onClose, onLicensesUpdated
 
   const handleConfirmDelete = async () => {
     if (!deletingLic) return;
+    const explanation = deleteExplanation.trim();
+    if (!explanation) return;
     setDeleting(true);
     setError(null);
     try {
-      await journalService.deleteLicense(deletingLic.id);
+      await journalService.deleteLicense(deletingLic.id, explanation);
       showSuccess(`Licencia "${deletingLic.name}" eliminada.`);
       setDeletingLic(null);
+      setDeleteExplanation("");
       await fetchLicenses();
       onLicensesUpdated?.();
     } catch (err) {
@@ -293,7 +297,10 @@ export default function LicenseManagerModal({ isOpen, onClose, onLicensesUpdated
                         </button>
                         <button
                           type="button"
-                          onClick={() => setDeletingLic(lic)}
+                          onClick={() => {
+                            setDeletingLic(lic);
+                            setDeleteExplanation("");
+                          }}
                           className="p-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-300 transition-all cursor-pointer"
                           title="Eliminar licencia"
                         >
@@ -325,17 +332,34 @@ export default function LicenseManagerModal({ isOpen, onClose, onLicensesUpdated
       {/* Delete Confirmation Sub-Modal */}
       {deletingLic && (
         <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl border border-gray-200 animate-in fade-in zoom-in-95 duration-150">
+          <div className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-gray-200 animate-in fade-in zoom-in-95 duration-150">
             <h4 className="font-bold text-gray-900 text-sm">¿Eliminar licencia?</h4>
             <p className="text-xs text-gray-600 mt-2">
               ¿Estás seguro de que deseas eliminar la licencia{" "}
               <strong>&ldquo;{deletingLic.name}&rdquo;</strong>? Esta acción no se puede deshacer.
             </p>
+            <div className="mt-4 space-y-1.5">
+              <label htmlFor="license-delete-explanation" className="text-xs font-semibold text-gray-700">
+                Explicación / Motivo de eliminación
+              </label>
+              <textarea
+                id="license-delete-explanation"
+                rows={3}
+                value={deleteExplanation}
+                onChange={(event) => setDeleteExplanation(event.target.value)}
+                required
+                placeholder="Ej.: Licencia retirada por solicitud institucional..."
+                className="w-full rounded-xl border border-gray-200 p-3 text-xs focus:border-rose-600 focus:ring-1 focus:ring-rose-600 outline-none transition-all placeholder:text-gray-400"
+              />
+            </div>
             <div className="mt-5 flex items-center justify-end gap-2">
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setDeletingLic(null)}
+                onClick={() => {
+                  setDeletingLic(null);
+                  setDeleteExplanation("");
+                }}
                 disabled={deleting}
                 className="rounded-lg text-xs cursor-pointer"
               >
@@ -344,7 +368,7 @@ export default function LicenseManagerModal({ isOpen, onClose, onLicensesUpdated
               <Button
                 size="sm"
                 onClick={handleConfirmDelete}
-                disabled={deleting}
+                disabled={deleting || !deleteExplanation.trim()}
                 className="bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs cursor-pointer"
               >
                 {deleting ? "Eliminando..." : "Sí, eliminar"}

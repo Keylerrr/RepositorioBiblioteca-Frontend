@@ -47,8 +47,9 @@ export const platformService = {
    * Delete platform (DELETE /api/platforms/{id}/)
    */
   deletePlatform: async (id, deleteExplanation = "") => {
-    const body = deleteExplanation ? { delete_explanation: deleteExplanation } : null;
-    return apiClient.delete(`/api/platforms/${id}/`, body);
+    return apiClient.delete(`/api/platforms/${id}/`, {
+      delete_explanation: deleteExplanation.trim(),
+    });
   },
 
   /**

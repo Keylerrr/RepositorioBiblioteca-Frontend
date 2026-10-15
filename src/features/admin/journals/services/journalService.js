@@ -78,8 +78,10 @@ export const journalService = {
   /**
    * Delete license (DELETE /api/journals/licenses/{id}/)
    */
-  deleteLicense: async (id) => {
-    return apiClient.delete(`/api/journals/licenses/${id}/`);
+  deleteLicense: async (id, deleteExplanation) => {
+    return apiClient.delete(`/api/journals/licenses/${id}/`, {
+      delete_explanation: deleteExplanation,
+    });
   },
 
   /**
@@ -94,7 +96,7 @@ export const journalService = {
    */
   deleteJournal: async (id, deleteExplanation = "") => {
     return apiClient.delete(`/api/journals/${id}/`, {
-      delete_explanation: deleteExplanation,
+      delete_explanation: deleteExplanation.trim(),
     });
   },
 
