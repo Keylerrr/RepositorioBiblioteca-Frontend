@@ -577,7 +577,9 @@ export default function DatabaseForm({ initialData = null, isEdit = false }) {
             </div>
           </div>
 
-          {/* Programas académicos */}
+          {/*
+            Programas académicos temporalmente ocultos: el backend de plataformas
+            no los solicita en este momento. Se conserva el bloque para reactivarlo.
           <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-2xs space-y-2.5">
             <div className="flex items-center justify-between pb-1 border-b border-gray-100">
               <Label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">
@@ -610,6 +612,7 @@ export default function DatabaseForm({ initialData = null, isEdit = false }) {
               })}
             </div>
           </div>
+          */}
         </div>
 
       </div>
