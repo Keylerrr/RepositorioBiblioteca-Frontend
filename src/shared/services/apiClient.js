@@ -233,6 +233,7 @@ export function hasAccountPermission(user, action) {
 const accountQueries = {
   me: (signal) => accountsRequest("auth/me/", { signal }),
   users: (signal) => accountsRequest("users/", { signal }),
+  archivedUsers: (signal) => accountsRequest("users/archived/", { signal }),
   user: (id, signal) => accountsRequest(`users/${encodeURIComponent(id)}/`, { signal }),
   permissions: (signal) => accountsRequest("permissions/", { signal }),
   presets: (signal) => accountsRequest("presets/", { signal }),
@@ -250,6 +251,7 @@ export function createAccountsApi(mutateAction) {
     invite: (body) => mutate("users/invite/", "POST", body),
     updateUser: (id, body) => mutate(`users/${encodeURIComponent(id)}/`, "PATCH", body),
     deactivate: (id) => mutate(`users/${encodeURIComponent(id)}/`, "DELETE"),
+    restoreUser: (id) => mutate(`users/${encodeURIComponent(id)}/restore/`, "POST"),
     createPreset: (body) => mutate("presets/", "POST", body),
     updatePreset: (id, body) => mutate(`presets/${encodeURIComponent(id)}/`, "PATCH", body),
     deletePreset: (id) => mutate(`presets/${encodeURIComponent(id)}/`, "DELETE"),

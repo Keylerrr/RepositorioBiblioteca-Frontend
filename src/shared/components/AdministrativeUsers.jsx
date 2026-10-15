@@ -191,6 +191,7 @@ export default function AdministrativeUsers() {
           </div>
         </div>}
       </div>
+      {hasAccountPermission(viewer, "view") && <Button variant="outline" className={buttonStyle} href="/admin/papelera?vista=usuarios">Recuperar cuentas eliminadas</Button>}
       <p className="text-xs text-[#6B758A]">Las altas, cambios y retiros de administrativos pueden consultarse en la bitácora de cambios.</p>
       {selected && <DeactivateDialog user={selected} onClose={() => setSelected(null)} onDeleted={(user) => {
         setUsers((current) => current.map((item) => item.id === user.id ? { ...item, is_active: false } : item));
