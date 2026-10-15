@@ -54,12 +54,12 @@ export default function HarvestExecutions({ rows, onRefresh, busy = false, capti
 
   const columns = [
     { key: "platform_name", label: "FUENTE", width: "14%" },
-    { key: "state", label: "ESTADO", width: "15%", render: (row) => {
+    { key: "state", label: "ESTADO", width: "14%", render: (row) => {
       const state = STATES[row.state] || { label: row.state, badge: "info" };
       return <Badge state={row.state === "completed" && row.records_failed > 0 ? "warning" : state.badge}>{state.label}</Badge>;
     } },
-    { key: "started_at", label: "INICIO", width: "20%", muted: true, render: (row) => formatDate(row.started_at) },
-    { key: "duration", label: "DURACIÓN", width: "13%", muted: true, render: (row) => (
+    { key: "started_at", label: "INICIO", width: "19%", muted: true, render: (row) => formatDate(row.started_at) },
+    { key: "duration", label: "DURACIÓN", width: "12%", muted: true, render: (row) => (
       <span className="whitespace-nowrap tabular-nums" title="Horas:minutos:segundos">{row.duration?.split(".")[0] || "—"}</span>
     ) },
     { key: "result", label: "RESULTADO", width: "25%", render: (row) => (
@@ -68,7 +68,13 @@ export default function HarvestExecutions({ rows, onRefresh, busy = false, capti
         {row.error_message && <p className="mt-1 break-words text-xs text-[#820A1F]">{row.error_message}</p>}
       </div>
     ) },
-    { key: "actions", label: "ACCIONES", width: "13%", render: (row) => {
+    { key: "actions", label: "ACCIONES", width: "16%", render: (row) => {
+      if (row.state === "completed") return <Button
+        href={`/admin/cosecha?vista=revistas&cosecha=${row.id}`}
+        variant="quiet"
+        size="small"
+        aria-label={`Ver revistas de la cosecha de ${row.platform_name} (#${row.id})`}
+      >Ver revistas</Button>;
       if (row.state === "pausing") return <span className="text-xs text-[#68707C]">Esperando pausa…</span>;
       const resume = row.state === "paused";
       if (!resume && row.state !== "pending" && row.state !== "running") return <span className="text-[#68707C]">—</span>;
