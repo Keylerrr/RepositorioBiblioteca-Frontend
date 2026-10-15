@@ -5,8 +5,18 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { AlertTriangle, X } from "lucide-react";
 
-export default function DeleteModal({ isOpen, onClose, onConfirm, platformName, isDeleting }) {
+export default function DeleteModal({
+  isOpen,
+  onClose,
+  onConfirm,
+  platformName,
+  journalTitle,
+  entityType = "Plataforma",
+  isDeleting,
+}) {
   const [explanation, setExplanation] = useState("");
+  const entityName = journalTitle ?? platformName;
+  const isJournal = entityType === "Revista";
 
   if (!isOpen) return null;
 
@@ -25,7 +35,7 @@ export default function DeleteModal({ isOpen, onClose, onConfirm, platformName, 
             </div>
             <div>
               <h3 className="font-bold text-gray-900 text-base">Confirmar eliminación</h3>
-              <p className="text-xs text-gray-500 font-medium">Plataforma: {platformName}</p>
+              <p className="text-xs text-gray-500 font-medium">{entityType}: {entityName}</p>
             </div>
           </div>
           <button
@@ -38,7 +48,7 @@ export default function DeleteModal({ isOpen, onClose, onConfirm, platformName, 
 
         <form onSubmit={handleSubmit} className="mt-4 space-y-4">
           <p className="text-xs text-gray-600 leading-relaxed">
-            Esta acción realizará una eliminación lógica de la plataforma. Si existen relaciones activas, por favor proporcione un motivo.
+            Esta acción realizará una eliminación lógica de la {entityType.toLowerCase()}. Si existen relaciones activas, por favor proporcione un motivo.
           </p>
 
           <div className="space-y-1.5">
@@ -50,7 +60,9 @@ export default function DeleteModal({ isOpen, onClose, onConfirm, platformName, 
               rows={3}
               value={explanation}
               onChange={(e) => setExplanation(e.target.value)}
-              placeholder="Ej.: Plataforma retirada por finalización de suscripción institucional..."
+              placeholder={isJournal
+                ? "Ej.: Revista retirada por cese de publicación o solicitud institucional..."
+                : "Ej.: Plataforma retirada por finalización de suscripción institucional..."}
               className="w-full rounded-xl border border-gray-200 p-3 text-xs focus:border-[#C8102E] focus:ring-1 focus:ring-[#C8102E] outline-none transition-all placeholder:text-gray-400"
             />
           </div>
@@ -70,7 +82,7 @@ export default function DeleteModal({ isOpen, onClose, onConfirm, platformName, 
               disabled={isDeleting}
               className="rounded-xl bg-[#C8102E] hover:bg-[#A50D25] text-white text-xs font-medium px-4"
             >
-              {isDeleting ? "Eliminando..." : "Eliminar Plataforma"}
+              {isDeleting ? "Eliminando..." : `Eliminar ${entityType}`}
             </Button>
           </div>
         </form>

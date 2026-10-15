@@ -35,8 +35,6 @@ export default function DatabaseForm({ initialData = null, isEdit = false }) {
     base_api_url: "",
     api_key: "",
     url_image: "",
-    start_period: "",
-    finish_period: "",
     requires_registration: false,
     has_access_text: true,
     valid_sintaxis: "",
@@ -68,8 +66,6 @@ export default function DatabaseForm({ initialData = null, isEdit = false }) {
             base_api_url: initialData.base_api_url || "",
             api_key: "", // Write-only, never returned by backend
             url_image: initialData.url_image || "",
-            start_period: String(initialData.start_period || "").slice(0, 10),
-            finish_period: String(initialData.finish_period || "").slice(0, 10),
             requires_registration: Boolean(initialData.requires_registration),
             has_access_text: Boolean(initialData.has_access_text),
             valid_sintaxis: initialData.valid_sintaxis?.id || initialData.valid_sintaxis || "",
@@ -173,8 +169,6 @@ export default function DatabaseForm({ initialData = null, isEdit = false }) {
         // Si no es cosechable, enviar null para evitar HTTP 400 del backend
         base_api_url: formData.is_harvestable && formData.base_api_url ? formData.base_api_url.trim() : null,
         url_image: formData.url_image ? formData.url_image.trim() : null,
-        start_period: formData.start_period || null,
-        finish_period: formData.finish_period || null,
         requires_registration: formData.requires_registration,
         has_access_text: formData.has_access_text,
         valid_sintaxis: Number(formData.valid_sintaxis),
@@ -618,34 +612,6 @@ export default function DatabaseForm({ initialData = null, isEdit = false }) {
           </div>
         </div>
 
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-2xs space-y-1">
-            <Label htmlFor="start_period" className="text-[11px] font-medium text-gray-500 block">
-              Fecha de incorporación *
-            </Label>
-            <Input
-              id="start_period"
-              type="date"
-              value={formData.start_period}
-              onChange={(e) => setFormData({ ...formData, start_period: e.target.value })}
-              className="border-0 p-0 text-xs shadow-none focus-visible:ring-0 h-6 text-gray-900 font-medium"
-            />
-          </div>
-
-          <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-2xs space-y-1">
-            <Label htmlFor="finish_period" className="text-[11px] font-medium text-gray-500 block">
-              Fecha de desvinculación (opcional)
-            </Label>
-            <Input
-              id="finish_period"
-              type="date"
-              value={formData.finish_period}
-              onChange={(e) => setFormData({ ...formData, finish_period: e.target.value })}
-              className="border-0 p-0 text-xs shadow-none focus-visible:ring-0 h-6 text-gray-900 font-medium"
-            />
-          </div>
-        </div>
       </div>
 
       {/* SECCIÓN 3: Acceso y búsqueda */}
