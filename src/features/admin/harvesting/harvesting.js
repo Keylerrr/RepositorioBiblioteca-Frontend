@@ -13,7 +13,43 @@ const FIELD_NAMES = {
   delete_explanation: "Motivo de desactivación",
   url: "URL",
   non_field_errors: "Validación",
+  platform: "Plataforma",
+  title: "Título",
+  issn: "ISSN",
+  reason: "Motivo",
+  code: "Código",
+  status: "Estado",
+  status_code: "Código de estado",
+  record: "Registro",
+  records: "Registros",
 };
+
+// Harvest workers can return plain text, objects or serialized JSON in error_message.
+export function formatHarvestError(value) {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") {
+    const message = value.trim();
+    try {
+      return formatHarvestError(JSON.parse(message));
+    } catch {
+      return message;
+    }
+  }
+  if (Array.isArray(value)) {
+    return value.map(formatHarvestError).filter(Boolean).join("\n");
+  }
+  if (typeof value === "object") {
+    return Object.entries(value).flatMap(([field, detail]) => {
+      const message = formatHarvestError(detail);
+      if (!message) return [];
+      if (["detail", "message", "error", "errors", "error_message"].includes(field)) return [message];
+      const label = FIELD_NAMES[field] || field.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/[_-]+/g, " ");
+      const heading = label.charAt(0).toUpperCase() + label.slice(1);
+      return message.split("\n").map((line) => `${heading}: ${line}`);
+    }).join("\n");
+  }
+  return String(value);
+}
 
 export class ApiError extends Error {
   constructor(message, status, payload) {
