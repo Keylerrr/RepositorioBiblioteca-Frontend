@@ -5,7 +5,7 @@ import AdminTable from "@/shared/components/AdminTable";
 import Badge from "@/shared/components/Badge";
 import Button from "@/shared/components/Button";
 import Notice from "@/shared/components/Notice";
-import { formatDate } from "@/features/admin/harvesting/harvesting";
+import { formatDate, formatHarvestError } from "@/features/admin/harvesting/harvesting";
 import { useHarvestingApi } from "./HarvestingProvider";
 
 const STATES = {
@@ -62,12 +62,18 @@ export default function HarvestExecutions({ rows, onRefresh, busy = false, capti
     { key: "duration", label: "DURACIÓN", width: "12%", muted: true, render: (row) => (
       <span className="whitespace-nowrap tabular-nums" title="Horas:minutos:segundos">{row.duration?.split(".")[0] || "—"}</span>
     ) },
-    { key: "result", label: "RESULTADO", width: "25%", render: (row) => (
-      <div>
-        <span>{row.records_added} nuevas · {row.records_updated} actualizadas · {row.records_failed} fallidas</span>
-        {row.error_message && <p className="mt-1 break-words text-xs text-[#820A1F]">{row.error_message}</p>}
-      </div>
-    ) },
+    { key: "result", label: "RESULTADO", width: "25%", render: (row) => {
+      const errorMessage = formatHarvestError(row.error_message);
+      return (
+        <div>
+          <span>{row.records_added} nuevas · {row.records_updated} actualizadas · {row.records_failed} fallidas</span>
+          {errorMessage && <div className="mt-2 rounded-lg border border-[#820A1F]/15 bg-[#FFE1E3] p-3 text-xs leading-relaxed text-[#820A1F]">
+            <p className="font-semibold">Detalle del error</p>
+            <p className="mt-1 whitespace-pre-wrap [overflow-wrap:anywhere]">{errorMessage}</p>
+          </div>}
+        </div>
+      );
+    } },
     { key: "actions", label: "ACCIONES", width: "16%", render: (row) => {
       if (row.state === "completed") return <Button
         href={`/admin/cosecha?vista=revistas&cosecha=${row.id}`}
