@@ -104,11 +104,11 @@ function AdminLayoutContent({ children }) {
 
       {/* Sidebar - Ahora con fondo rojo institucional */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-[#C8102E] flex flex-col justify-between transform transition-transform duration-200 ease-in-out md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 h-dvh w-64 shrink-0 bg-[#C8102E] flex flex-col justify-between transform transition-transform duration-200 ease-in-out md:translate-x-0 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        } md:static md:z-auto`}
+        } md:sticky md:top-0 md:self-start md:z-auto`}
       >
-        <div className="overflow-y-auto no-scrollbar pb-6">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain no-scrollbar pb-6">
           {/* Logo & Header */}
           <div className="p-6 flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center text-white font-medium text-lg shrink-0">
@@ -160,7 +160,7 @@ function AdminLayoutContent({ children }) {
         </div>
 
         {/* User Footer - Tarjeta de usuario al estilo del diseño */}
-        <div className="p-4 mt-auto">
+        <div className="shrink-0 p-4 mt-auto">
           <button type="button" onClick={signOut} disabled={signingOut} className="w-full text-left disabled:opacity-60">
             <div className="flex items-center justify-between p-3 rounded-xl bg-white/10 hover:bg-white/15 transition-colors cursor-pointer group">
               <div className="flex items-center gap-3 overflow-hidden">
