@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import AdminLayout from "@/shared/layouts/AdminLayout";
 import AccountsGateway from "@/shared/components/AccountsGateway";
 import { apiClient } from "@/shared/services/apiClient";
+import { getUserDisplayName } from "@/shared/services/userService";
 
 export default async function AdminRouteLayout({ children }) {
   const store = await cookies();
@@ -23,5 +24,5 @@ export default async function AdminRouteLayout({ children }) {
 
   if (!user || user.force_password_change) redirect("/admin/login");
 
-  return <AccountsGateway><AdminLayout>{children}</AdminLayout></AccountsGateway>;
+  return <AccountsGateway><AdminLayout userName={getUserDisplayName(user)}>{children}</AdminLayout></AccountsGateway>;
 }
